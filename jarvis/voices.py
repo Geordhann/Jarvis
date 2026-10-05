@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import unicodedata
-from pathlib import Path
+
+from . import config
 
 # Prénom (tel qu'on le prononce) -> (identifiant edge-tts, description)
 VOICES: dict[str, tuple[str, str]] = {
@@ -24,7 +24,6 @@ VOICES: dict[str, tuple[str, str]] = {
 }
 
 DEFAULT_VOICE_NAME = "Henri"
-CONFIG_PATH = Path.home() / ".jarvis.json"
 
 
 def _plain(text: str) -> str:
@@ -52,19 +51,8 @@ def describe(name: str) -> str:
 
 
 def load_saved_voice() -> str | None:
-    try:
-        return json.loads(CONFIG_PATH.read_text(encoding="utf-8")).get("voix")
-    except (OSError, ValueError):
-        return None
+    return config.get("voix")
 
 
 def save_voice(name: str) -> None:
-    try:
-        data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        data = {}
-    data["voix"] = name
-    try:
-        CONFIG_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    except OSError as exc:
-        print(f"[voix] impossible d'enregistrer le choix : {exc}")
+    config.save("voix", name)

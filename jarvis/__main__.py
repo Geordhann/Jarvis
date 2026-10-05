@@ -6,19 +6,23 @@ import argparse
 import datetime
 import os
 import re
+import sys
 import time
 import unicodedata
 
 import anthropic
 
-from . import voices
-from .brain import Brain, french_date, french_time
+from . import autostart, config, voices
+from .brain import MODELS, Brain, french_date, french_time
 from .voice import Voice
 
 # La reconnaissance vocale écrit parfois « Jarvis » de travers.
 WAKE_RE = re.compile(r"\b(jarvis|jarvi|jarvice|jarviss|jervis|djarvis|jarwis)\b[\s,.!?]*")
 # Après une réponse, on peut enchaîner une question sans redire « Jarvis » pendant ce délai.
 FOLLOW_UP_SECONDS = 8
+# Sans question pendant ce délai, Jarvis oublie la conversation : chaque question
+# renvoie tout l'historique à Claude, donc l'effacer garde les coûts bas.
+FORGET_AFTER_SECONDS = 10 * 60
 
 STOP_WORDS = ("au revoir", "bonne nuit", "eteins-toi", "eteins toi", "arrete-toi", "quitter", "exit")
 RESET_WORDS = ("nouvelle conversation", "oublie tout")
@@ -48,11 +52,12 @@ class Jarvis:
     def __init__(self, args: argparse.Namespace):
         self.title = args.titre
         self.always_listen = args.toujours
-        self.brain = Brain(owner=args.nom, title=args.titre, effort=args.effort)
+        self.brain = Brain(owner=args.nom, title=args.titre, effort=args.effort, model=args.modele)
         self.voice_name = voices.find_voice(args.voix) or args.voix
         self.voice = Voice(voice=voices.voice_id(args.voix), muted=args.muet)
-        self.ears = None if args.texte else _init_ears()
+        self.ears = None if args.texte else _init_ears(retry=args.fond)
         self.awake_until = 0.0
+        self.last_request = time.monotonic()
 
     # --- boucle principale -------------------------------------------------
 
@@ -123,6 +128,10 @@ class Jarvis:
             return True
         if self._handle_voice(request, plain):
             return True
+        if time.monotonic() - self.last_request > FORGET_AFTER_SECONDS:
+            self.brain.reset()
+        self.last_request = time.monotonic()
+
         # Réponses instantanées, sans passer par Claude.
         now = datetime.datetime.now()
         if TIME_RE.search(plain) and len(plain.split()) <= 8:
@@ -169,14 +178,19 @@ class Jarvis:
             self.voice.say("Je n'arrive pas à joindre mes serveurs. Vérifiez la connexion Internet.")
 
 
-def _init_ears():
+def _init_ears(retry: bool = False):
     from .ears import Ears
 
-    try:
-        return Ears()
-    except Exception as exc:
-        print(f"Micro indisponible ({exc}). Passage en mode texte.")
-        return None
+    while True:
+        try:
+            return Ears()
+        except Exception as exc:
+            if not retry:
+                print(f"Micro indisponible ({exc}). Passage en mode texte.")
+                return None
+            # Lancé en arrière-plan : pas de clavier, on attend que le micro soit prêt.
+            print(f"Micro indisponible ({exc}). Nouvel essai dans 30 secondes.")
+            time.sleep(30)
 
 
 def choose_voice_menu(muted: bool) -> None:
@@ -219,10 +233,47 @@ def main() -> None:
     parser.add_argument("--titre", default=os.getenv("JARVIS_TITLE", "Monsieur"),
                         help="comment Jarvis t'appelle")
     parser.add_argument("--nom", default=os.getenv("JARVIS_OWNER", "Monsieur"), help="ton prénom")
+    parser.add_argument("--modele", default=os.getenv("JARVIS_MODEL") or config.get("modele") or "opus",
+                        help="opus (le plus intelligent), sonnet (2x moins cher), haiku (4x moins cher) "
+                             "ou un identifiant de modèle Claude ; mémorisé")
+    parser.add_argument("--cle", metavar="CLE_API",
+                        help="enregistrer ta clé API Anthropic (sk-ant-…) pour ne plus avoir à la donner")
+    parser.add_argument("--installer-demarrage", action="store_true",
+                        help="lancer Jarvis automatiquement à chaque démarrage de l'ordinateur")
+    parser.add_argument("--retirer-demarrage", action="store_true",
+                        help="ne plus lancer Jarvis au démarrage")
+    parser.add_argument("--fond", action="store_true",
+                        help="mode arrière-plan (utilisé au démarrage) : journal dans ~/.jarvis.log")
     parser.add_argument("--effort", default=os.getenv("JARVIS_EFFORT", "low"),
                         choices=["low", "medium", "high", "xhigh", "max"],
                         help="profondeur de réflexion (low = plus rapide)")
     args = parser.parse_args()
+
+    if args.fond:
+        log = open(config.LOG_PATH, "a", encoding="utf-8", buffering=1)
+        sys.stdout = sys.stderr = log
+        args.texte = False
+        print(f"\n=== Démarrage de Jarvis {datetime.datetime.now():%Y-%m-%d %H:%M} ===")
+
+    if args.cle:
+        config.save("cle_api", args.cle.strip())
+        print(f"Clé API enregistrée dans {config.CONFIG_PATH}.")
+    if args.modele != (config.get("modele") or "opus"):
+        config.save("modele", args.modele)
+    config.apply_api_key()
+
+    if args.installer_demarrage:
+        path = autostart.install()
+        print(f"Jarvis se lancera tout seul à chaque démarrage ({path}).")
+        if not os.getenv("ANTHROPIC_API_KEY"):
+            print("Attention : aucune clé API enregistrée. Lance : python -m jarvis --cle sk-ant-...")
+        return
+    if args.retirer_demarrage:
+        path = autostart.uninstall()
+        print(f"Lancement automatique retiré ({path})." if path else "Jarvis n'était pas au démarrage.")
+        return
+    if args.cle:
+        return
 
     if args.liste_voix:
         for name in voices.VOICES:
@@ -230,6 +281,11 @@ def main() -> None:
         return
     if args.choisir_voix:
         choose_voice_menu(args.muet)
+        return
+
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        print("Aucune clé API. Crée-en une sur https://console.anthropic.com/ puis lance :\n"
+              "  python -m jarvis --cle sk-ant-...")
         return
 
     Jarvis(args).run()

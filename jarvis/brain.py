@@ -8,7 +8,12 @@ from typing import Callable, Iterator
 
 import anthropic
 
-MODEL = "claude-opus-5-5"
+# Plus le modèle est puissant, plus il coûte cher (prix pour un million de mots-jetons).
+MODELS = {
+    "opus": "claude-opus-5-5",      # le plus intelligent : 4 $ en entrée / 20 $ en sortie
+    "sonnet": "claude-sonnet-5-5",  # très bon et 2x moins cher : 2 $ / 10 $
+    "haiku": "claude-haiku-4-5",    # le plus rapide et 4x moins cher : 1 $ / 5 $
+}
 
 SYSTEM_PROMPT = """Tu es JARVIS, l'assistant personnel de {owner}, inspiré du majordome IA d'Iron Man.
 Tu parles français, avec un ton poli, posé, légèrement pince-sans-rire, et tu appelles ton utilisateur "{title}".
@@ -42,8 +47,10 @@ def french_time(t: datetime.datetime) -> str:
 
 
 class Brain:
-    def __init__(self, owner: str = "Monsieur", title: str = "Monsieur", effort: str = "low"):
+    def __init__(self, owner: str = "Monsieur", title: str = "Monsieur", effort: str = "low",
+                 model: str = "opus"):
         self.client = anthropic.Anthropic()
+        self.model = MODELS.get(model, model)
         self.effort = effort
         self.messages: list = []
         self._last_stop_reason = None
@@ -79,19 +86,30 @@ class Brain:
             return msg
         return "".join(full)
 
-    def _stream_turn(self) -> Iterator[str]:
-        with self.client.beta.messages.stream(
-            model=MODEL,
+    def _request(self) -> dict:
+        request = dict(
+            model=self.model,
             max_tokens=16000,
             system=self.system,
             messages=self.messages,
-            thinking={"type": "adaptive"},
-            output_config={"effort": self.effort},
-            tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 3}],
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
             cache_control={"type": "ephemeral"},
-        ) as stream:
+        )
+        if self.model == MODELS["haiku"]:
+            # Haiku : pas de réflexion adaptative, ancienne version de la recherche web.
+            request["tools"] = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}]
+        else:
+            request.update(
+                thinking={"type": "adaptive"},
+                output_config={"effort": self.effort},
+                tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 3}],
+                # Si Claude refuse une demande, l'API réessaie automatiquement avec un autre modèle.
+                betas=["server-side-fallback-2026-07-01"],
+                fallbacks="default",
+            )
+        return request
+
+    def _stream_turn(self) -> Iterator[str]:
+        with self.client.beta.messages.stream(**self._request()) as stream:
             yield from stream.text_stream
             final = stream.get_final_message()
         self._last_stop_reason = final.stop_reason
