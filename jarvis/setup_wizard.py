@@ -5,7 +5,8 @@ from __future__ import annotations
 import getpass
 import secrets
 
-from . import autostart, config, profile, voices
+from . import autostart, config, profile, telegram_perso, voices
+from .tools import media
 from .tools import google as google_tools
 
 
@@ -94,7 +95,21 @@ def run() -> None:
         config.save("whatsapp_verification", verify)
         print(f"Dans Meta, URL du webhook : https://<ton-tunnel>/whatsapp — jeton de vérification : {verify}")
 
-    _title("7. Démarrage automatique")
+    _title("7. Tes messages Telegram personnels")
+    print("Pour que Jarvis lise et envoie TES messages Telegram (pas seulement ceux du bot).")
+    if _yes("Connecter ton compte Telegram perso ?", False):
+        print("Sur https://my.telegram.org → API development tools : crée une app, note api_id et api_hash.")
+        try:
+            telegram_perso.connect_interactive()
+        except Exception as exc:
+            print(f"Connexion impossible : {exc}")
+
+    _title("8. Musique")
+    folder = _ask("Dossier de ta musique sur l'ordinateur", str(media.music_dir()))
+    config.save("dossier_musique", folder)
+    print("Si un morceau n'y est pas, Jarvis le lance sur YouTube.")
+
+    _title("9. Démarrage automatique")
     if _yes("Lancer Jarvis automatiquement à chaque démarrage de l'ordinateur ?"):
         print(f"Installé : {autostart.install()}")
 

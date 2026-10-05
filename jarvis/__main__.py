@@ -13,8 +13,9 @@ import unicodedata
 
 import anthropic
 
-from . import autostart, config, profile, services, sessions, voices
+from . import announcer, autostart, config, profile, repliques, services, sessions, telegram_perso, voices
 from .agent import MODELS, french_date, french_time
+from .tools import ToolFailure, media
 from .voice import Voice
 
 # La reconnaissance vocale écrit parfois « Jarvis » de travers.
@@ -22,11 +23,26 @@ WAKE_RE = re.compile(r"\b(jarvis|jarvi|jarvice|jarviss|jervis|djarvis|jarwis)\b[
 # Après une réponse, on peut enchaîner une question sans redire « Jarvis » pendant ce délai.
 FOLLOW_UP_SECONDS = 8
 
-STOP_WORDS = ("au revoir", "bonne nuit", "eteins-toi", "eteins toi", "arrete-toi", "quitter", "exit")
+STOP_WORDS = ("au revoir", "eteins-toi", "eteins toi", "arrete-toi", "quitter", "exit")
 RESET_WORDS = ("nouvelle conversation", "oublie tout")
 TIME_RE = re.compile(r"\b(quelle heure|l'heure|l heure|heure est-il|heure il est)\b")
 DATE_RE = re.compile(r"\b(quel jour|quelle date|la date|on est le combien|sommes-nous)\b")
 VOICE_CHANGE_RE = re.compile(r"\b(voix)\b")
+# Commandes musique instantanées (sans Claude). Texte sans accents.
+MEDIA_COMMANDS = [
+    (r"(mets? )?(la musique |la video )?(en )?pause|stop(pe)? la musique|arrete la musique|coupe la musique", "pause"),
+    (r"reprends?( la musique)?|relance la musique|remets la musique|lecture", "lecture"),
+    (r"(chanson|musique|morceau|titre) suivante?|suivant|passe a la suivante", "suivant"),
+    (r"(chanson|musique|morceau|titre) precedente?|precedent|reviens en arriere", "precedent"),
+    (r"(monte|augmente)( un peu)? (le )?(son|volume)|plus fort", "volume_plus"),
+    (r"(baisse|diminue)( un peu)? (le )?(son|volume)|moins fort", "volume_moins"),
+    (r"coupe le son|mode muet|silence", "muet"),
+]
+MEDIA_COMMANDS = [(re.compile(rf"^(?:{p})(?: s'il te plait| stp)?$"), a) for p, a in MEDIA_COMMANDS]
+PLAY_RE = re.compile(r"^(?:mets|lance|joue)(?:-moi)?\s+(?:de la |la |une |un )?"
+                     r"(?:musique|chanson|morceau|playlist|son)\s*(?:de |du |des |d')?(.*)$|^joue(?:-moi)?\s+(.+)$")
+ANNOUNCE_OFF_RE = re.compile(r"\b(arrete|stoppe|desactive|coupe) les annonces\b")
+ANNOUNCE_ON_RE = re.compile(r"\b(active|reactive|remets) les annonces\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
 
 
@@ -63,6 +79,8 @@ class Jarvis:
     # --- boucle principale -------------------------------------------------
 
     def run(self) -> None:
+        if not self.voice.muted:
+            announcer.start(self.voice.say)
         hint = "" if self.always_listen or self.ears is None else " Dites « Jarvis » suivi de votre demande."
         self.voice.say(f"Bonjour {self.title}. Tous les systèmes sont opérationnels.{hint}")
         self.voice.wait()
@@ -120,6 +138,10 @@ class Jarvis:
         """Traite une demande. Renvoie False pour éteindre Jarvis."""
         plain = _plain(request)
 
+        ready = repliques.find(request)
+        if ready:  # réplique prête à être dite : instantané et gratuit
+            self.voice.say(ready)
+            return True
         if any(w in plain for w in STOP_WORDS):
             self.voice.say(f"À votre service, {self.title}. Bonne journée.")
             return False
@@ -127,7 +149,12 @@ class Jarvis:
             sessions.reset("voix")
             self.voice.say("C'est oublié. On repart de zéro.")
             return True
-        if self._handle_voice(request, plain):
+        if self._handle_voice(request, plain) or self._handle_media(request, plain):
+            return True
+        if ANNOUNCE_OFF_RE.search(plain) or ANNOUNCE_ON_RE.search(plain):
+            on = bool(ANNOUNCE_ON_RE.search(plain))
+            config.save("annonces", "oui" if on else "non")
+            self.voice.say("Annonces réactivées." if on else "Très bien, je ne vous annonce plus rien.")
             return True
         # Réponses instantanées et gratuites, sans passer par Claude.
         now = datetime.datetime.now()
@@ -154,6 +181,26 @@ class Jarvis:
             names = ", ".join(voices.catalog())
             self.voice.say(f"Je peux prendre les voix suivantes : {names}. "
                            f"Dites par exemple : Jarvis, prends la voix de {voices.default_voice()}.")
+            return True
+        return False
+
+    def _handle_media(self, request: str, plain: str) -> bool:
+        clean = plain.strip(" .!?")
+        play = PLAY_RE.match(clean)
+        try:
+            if play and (play.group(1) or play.group(2)):
+                # On reprend le texte original (accents compris) pour la recherche.
+                query = request.strip(" .!?")[len(clean) - len(play.group(1) or play.group(2)):]
+                self.voice.say("Je lance ça.")
+                self.voice.wait()
+                media.jouer_musique(query)
+                return True
+            for pattern, action in MEDIA_COMMANDS:
+                if pattern.match(clean):
+                    media.controle_media(action)
+                    return True
+        except ToolFailure as exc:
+            self.voice.say(f"Je n'y arrive pas : {exc}.")
             return True
         return False
 
@@ -218,6 +265,9 @@ def main() -> None:
     setup.add_argument("--connecter-google", nargs="?", const="", metavar="FICHIER_JSON",
                        help="relier Gmail et Google Agenda")
     setup.add_argument("--cle", metavar="CLE_API", help="enregistrer ta clé API Anthropic")
+    setup.add_argument("--connecter-telegram-perso", action="store_true",
+                       help="relier ton compte Telegram personnel (lire et envoyer tes messages)")
+    setup.add_argument("--dossier-musique", metavar="DOSSIER", help="dossier de ta musique locale")
     setup.add_argument("--elevenlabs", metavar="CLE", help="enregistrer ta clé ElevenLabs")
     setup.add_argument("--telegram", metavar="JETON", help="enregistrer le jeton de ton bot Telegram")
     setup.add_argument("--telegram-autoriser", metavar="ID", help="autoriser ton compte Telegram")
@@ -250,7 +300,8 @@ def main() -> None:
     # --- réglages ponctuels ------------------------------------------------
     one_shot = False
     for flag, key in (("cle", "cle_api"), ("elevenlabs", "elevenlabs_cle"), ("telegram", "telegram_token"),
-                      ("telegram_autoriser", "telegram_utilisateur"), ("modele", "modele"), ("effort", "effort")):
+                      ("telegram_autoriser", "telegram_utilisateur"),
+                      ("dossier_musique", "dossier_musique"), ("modele", "modele"), ("effort", "effort")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
@@ -271,6 +322,8 @@ def main() -> None:
         google_tools.connect(args.connecter_google or None)
         print("Gmail et Google Agenda sont connectés.")
         return
+    if args.connecter_telegram_perso:
+        return telegram_perso.connect_interactive()
     if args.installer_demarrage:
         print(f"Jarvis se lancera tout seul à chaque démarrage ({autostart.install()}).")
         return

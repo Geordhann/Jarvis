@@ -25,6 +25,9 @@ cherche sur le web, ouvre des pages, se souvient de toi, et te répond avec une 
 | Messagerie | Telegram et WhatsApp, texte et vocaux | `jarvis/telegram_bot.py`, `jarvis/whatsapp.py` |
 | Voix | ElevenLabs (réaliste) ou voix gratuite | `jarvis/tts.py` |
 | Interface | tableau de bord avec réacteur animé par la voix, micro, mains libres | `jarvis/interface/` |
+| Musique | lance un morceau (fichiers locaux ou YouTube), pause, suivant, volume | `jarvis/tools/media.py` |
+| Messages | lit et envoie tes messages Telegram perso, annonce les nouveaux mails et messages | `jarvis/telegram_perso.py`, `jarvis/announcer.py` |
+| Répliques | phrases prêtes à dire pour des questions précises, instantanées et gratuites | `jarvis/repliques.json` |
 
 ---
 
@@ -124,6 +127,47 @@ Seuls les messages signés par Meta et venant de **ton** numéro sont traités. 
 n'est jamais exposée par ce tunnel. La messagerie WhatsApp Business peut être facturée par Meta
 selon le volume (les réponses dans les 24 h à tes messages sont en général gratuites).
 
+### Musique
+Rien à configurer : « Jarvis, mets de la musique de Daft Punk » cherche d'abord dans ton dossier
+Musique (`--dossier-musique CHEMIN` pour en choisir un autre), sinon lance directement la vidéo
+YouTube. Ensuite : « pause », « reprends », « chanson suivante », « monte le son », « coupe le son »
+(ces commandes fonctionnent avec n'importe quel lecteur : YouTube, Spotify, VLC…).
+« Ouvre Spotify » lance l'application.
+
+### Tes messages Telegram personnels
+Le bot Telegram ne voit que les messages qu'on **lui** envoie. Pour que Jarvis lise **tes** messages :
+1. <https://my.telegram.org> → *API development tools* → crée une application, note `api_id` et `api_hash`.
+2. `python -m jarvis --connecter-telegram-perso` → numéro de téléphone puis code reçu dans Telegram.
+
+« Jarvis, j'ai des messages ? » lit tes messages non lus ; « réponds à Julie que j'arrive » prépare
+la réponse et attend ton « oui ». Utilise ce lien pour ton propre compte uniquement.
+
+**WhatsApp perso et SMS** : Jarvis ne peut pas les lire. WhatsApp n'offre aucun accès officiel aux
+conversations personnelles (les outils non officiels peuvent faire bannir ton numéro), et les SMS
+restent sur le téléphone.
+
+### Annonces automatiques
+Quand Jarvis tourne avec le micro, il annonce à voix haute les **nouveaux mails** (boîte principale,
+vérifiée toutes les 2 minutes) et les **nouveaux messages Telegram privés** : « Monsieur, nouveau mail
+de Marc : devis cuisine. » C'est gratuit (pas d'appel à Claude).
+« Jarvis, arrête les annonces » / « active les annonces ».
+
+### Répliques prêtes à dire
+Pour certaines phrases, Jarvis a une réponse toute prête, dite instantanément et sans rien coûter :
+
+| Tu dis | Jarvis répond |
+|---|---|
+| « Jarvis, tu es là ? » | « Pour vous, toujours, Monsieur. » |
+| « Jarvis, qui es-tu ? » | « Je suis JARVIS. Just A Rather Very Intelligent System… » |
+| « Jarvis, papa est rentré » | « Bienvenue à la maison, Monsieur. Il est 19 h 30. » |
+| « Jarvis, comment ça va ? » | « Tous mes systèmes fonctionnent à pleine capacité… » |
+| « Jarvis, bonne nuit » | « Bonne nuit, Monsieur. Je veille sur tout. » |
+
+Pour en ajouter, dis simplement : « Jarvis, quand je te dis "mission accomplie", réponds "Encore un
+succès, Monsieur" ». Ou modifie `~/.jarvis/repliques.json` (même format que `jarvis/repliques.json` ;
+`{titre}`, `{heure}` et `{date}` sont remplacés automatiquement, et s'il y a plusieurs réponses,
+Jarvis en choisit une au hasard).
+
 ## 3. Utilisation
 
 ```bash
@@ -145,10 +189,12 @@ Le micro de la page fonctionne dans Chrome et Edge.
 - « Jarvis, réponds à Marc que je serai en retard » → il rédige, te lit le mail, attend ton « oui »
 - « Jarvis, ajoute dentiste jeudi à 15 h » → il vérifie l'agenda puis confirme avec toi
 - « Jarvis, retiens que ma fille s'appelle Léa » → il s'en souviendra pour toujours
-- « Jarvis, mets de la musique de Daft Punk » → ouvre YouTube
+- « Jarvis, mets de la musique de Daft Punk » → la lance ; « Jarvis, pause » / « chanson suivante »
+- « Jarvis, quels mails j'ai reçus ? » / « j'ai des messages ? »
+- « Jarvis, tu es là ? » → réplique prête, instantanée
 - « Jarvis, donne-moi l'heure » → instantané et gratuit
 - « Jarvis, prends la voix de Daniel » / « change de voix »
-- « Jarvis, nouvelle conversation » / « au revoir »
+- « Jarvis, nouvelle conversation » / « au revoir » (éteint Jarvis)
 
 Après chaque réponse, tu as 8 secondes pour enchaîner sans redire « Jarvis ».
 
@@ -158,6 +204,18 @@ python -m jarvis --installer-demarrage    # à chaque allumage, en arrière-plan
 python -m jarvis --retirer-demarrage
 ```
 Ce qu'il fait est noté dans `~/.jarvis.log`.
+
+## Inspirations
+
+Projets et tutos étudiés pour construire cette version :
+- [sacha9214/jarvis-vocal](https://github.com/sacha9214/jarvis-vocal) : Jarvis français local (Whisper, Piper), contrôle musique et réponses rapides sans IA
+- [bertrandmbanwi/Jarvis](https://github.com/bertrandmbanwi/Jarvis) : 100+ outils, interface en particules, mémoire
+- [AnubhavChaturvedi-GitHub/jarvis-ai-assistant](https://github.com/AnubhavChaturvedi-GitHub/jarvis-ai-assistant) : automatisation WhatsApp, recherche web
+- [projectswithdigambar/jarvis](https://github.com/projectswithdigambar/jarvis) : interface web, YouTube et Spotify
+- [codewithdars/jarvis-voice-assistant](https://github.com/codewithdars/jarvis-voice-assistant) : musique via yt-dlp
+- [EZHOWWW/tg-skill](https://github.com/EZHOWWW/tg-skill) : Telegram perso (Telethon) pour agents IA
+- Tutos : [Le Geek Heureux — Crée ton propre Jarvis en Python](https://legeekheureux.fr/%F0%9F%A4%96-cree-ton-propre-jarvis-en-python-un-assistant-vocal-pour-ton-pc/),
+  [« J'ai codé mon propre Jarvis » (YouTube)](https://www.youtube.com/watch?v=s7qmuKYh2fs)
 
 ## 4. Ajouter tes propres skills
 
@@ -180,7 +238,7 @@ Jarvis voit la liste des skills et lit la fiche quand une demande correspond. Fi
 
 | Partie | Prix |
 |---|---|
-| Écoute au micro, voix gratuite, Telegram | gratuit |
+| Écoute au micro, voix gratuite, Telegram, musique, annonces, répliques prêtes | gratuit |
 | Cerveau (Claude, API Anthropic) | **payant à l'usage** — pas inclus dans un abonnement Claude.ai |
 | Voix ElevenLabs | gratuit jusqu'à ~10 min/mois, puis abonnement |
 | WhatsApp | selon les règles de facturation de Meta |
@@ -193,7 +251,7 @@ Estimation **par demande** (dépend de la longueur et du nombre d'outils utilis�
 | Claude Sonnet 5.5 | `--modele sonnet` | ~0,5 à 1,5 centime | ~3 à 8 centimes |
 | Claude Haiku 4.5 | `--modele haiku` | ~0,3 à 0,8 centime | ~1 à 4 centimes |
 
-Une recherche web ajoute environ 1 centime. L'heure, la date et le changement de voix sont gratuits.
+Une recherche web ajoute environ 1 centime. L'heure, la date, la voix, les commandes musique (pause, suivant, volume) et les répliques prêtes sont gratuites.
 Tant que tu ne dis pas « Jarvis », rien n'est envoyé. Après 10 minutes sans message, la conversation
 en cours est oubliée pour ne pas renvoyer un long historique (la mémoire longue, elle, reste).
 Fixe une limite de dépense mensuelle dans la console Anthropic.
@@ -217,6 +275,8 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--configurer` | configuration guidée |
 | `--profil` | modifier « qui tu es » |
 | `--connecter-google FICHIER` | relier Gmail et Agenda |
+| `--connecter-telegram-perso` | relier ton compte Telegram (lire et envoyer tes messages) |
+| `--dossier-musique DOSSIER` | dossier de ta musique locale |
 | `--elevenlabs CLE`, `--telegram JETON`, `--telegram-autoriser ID`, `--cle CLE` | enregistrer une clé |
 | `--modele opus/sonnet/haiku`, `--effort low…max` | cerveau (mémorisé) |
 | `--voix NOM`, `--choisir-voix`, `--liste-voix` | voix |

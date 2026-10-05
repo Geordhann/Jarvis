@@ -17,7 +17,7 @@ from anthropic.lib.tools import ToolError
 # Mémoire persistante fournie par le SDK : des fichiers dans ~/.jarvis/memories/.
 from anthropic.lib.tools._beta_builtin_memory_tool import BetaLocalFilesystemMemoryTool
 
-from . import config, profile, skills
+from . import config, profile, repliques, skills, telegram_perso
 from .tools import Tool, ToolFailure, all_tools
 from .tools import google as google_tools
 
@@ -63,8 +63,9 @@ Pour ces tâches, lis d'abord la fiche avec l'outil lire_skill, puis suis-la :
 
 # Tes outils
 {tools_note}
-Tu peux chercher sur le web et lire des pages (web_search, web_fetch), et ouvrir des pages
-dans le navigateur de l'ordinateur.
+Tu peux chercher sur le web et lire des pages (web_search, web_fetch), ouvrir des pages et des
+applications, lancer de la musique et la contrôler (pause, suivant, volume).
+{messages_note}
 
 # Règles de sécurité
 - Avant toute action qui engage l'utilisateur (envoyer un mail, créer un événement), annonce
@@ -136,7 +137,13 @@ class Agent:
             else "Gmail et Google Agenda ne sont pas connectés : si on te le demande, explique qu'il "
                  "faut lancer « python -m jarvis --connecter-google »."
         )
+        messages_note = (
+            "Tu as accès aux messages Telegram personnels de l'utilisateur." if telegram_perso.is_configured()
+            else "Les messages Telegram personnels ne sont pas connectés (python -m jarvis --connecter-telegram-perso)."
+        ) + (" Tu n'as pas accès à ses SMS ni à ses conversations WhatsApp personnelles : "
+             "WhatsApp et les opérateurs ne le permettent pas.")
         self.system = SYSTEM_PROMPT.format(
+            messages_note=messages_note,
             profile=profile.read() or "(profil vide)",
             skills=skills.catalog(self.skills) or "(aucune)",
             tools_note=tools_note,
@@ -185,6 +192,10 @@ class Agent:
             return self._ask(text, on_sentence or (lambda s: None), on_tool or (lambda n: None))
 
     def _ask(self, text: str, on_sentence, on_tool) -> str:
+        ready = repliques.find(text)
+        if ready:  # réplique prête : instantané, sans appeler Claude
+            on_sentence(ready)
+            return ready
         now = datetime.datetime.now()
         start = len(self.messages)
         self.messages.append({"role": "user", "content": f"[{french_date(now.date())}, {french_time(now)}]\n{text}"})

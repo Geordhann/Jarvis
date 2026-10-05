@@ -13,3 +13,7 @@ google-auth-oauthlib
 # Telegram, WhatsApp et interface
 python-telegram-bot>=21
 aiohttp
+# Musique, contrôle multimédia et messages Telegram perso
+yt-dlp
+pynput
+telethon

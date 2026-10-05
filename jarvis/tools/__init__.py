@@ -65,9 +65,33 @@ def boolean(description: str) -> dict:
 
 
 def all_tools(skills_map) -> list[Tool]:
-    from . import browser, google
+    from .. import telegram_perso
+    from . import browser, google, media
 
-    return [*google.tools(), *browser.tools(), _skill_tool(skills_map)]
+    return [*google.tools(), *telegram_perso.tools(), *media.tools(), *browser.tools(),
+            _skill_tool(skills_map), _reply_tool()]
+
+
+def _reply_tool() -> Tool:
+    def ajouter_replique(questions: str, reponse: str) -> str:
+        from .. import repliques
+
+        items = [q.strip() for q in questions.split("|") if q.strip()]
+        if not items or not reponse.strip():
+            raise ToolFailure("il faut au moins une phrase déclencheuse et une réponse")
+        repliques.add(items, reponse.strip())
+        return f"Réplique enregistrée pour : {', '.join(items)}"
+
+    return Tool(
+        name="ajouter_replique",
+        description="Enregistre une réplique prête à dire : quand l'utilisateur dira exactement une de ces "
+                    "phrases, Jarvis répondra instantanément cette réponse. À utiliser quand il demande "
+                    "« quand je te dis X, réponds Y ». {titre}, {heure} et {date} sont remplacés automatiquement.",
+        properties={"questions": string("phrase(s) déclencheuse(s), séparées par |"),
+                    "reponse": string("réponse exacte à dire")},
+        required=["questions", "reponse"],
+        handler=ajouter_replique,
+    )
 
 
 def _skill_tool(skills_map) -> Tool:
