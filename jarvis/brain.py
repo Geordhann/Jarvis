@@ -1,0 +1,96 @@
+"""Le cerveau de Jarvis : conversation avec Claude, en streaming."""
+
+from __future__ import annotations
+
+import datetime
+import re
+from typing import Callable, Iterator
+
+import anthropic
+
+MODEL = "claude-opus-5-5"
+
+SYSTEM_PROMPT = """Tu es JARVIS, l'assistant personnel de {owner}, inspiré du majordome IA d'Iron Man.
+Tu parles français, avec un ton poli, posé, légèrement pince-sans-rire, et tu appelles ton utilisateur "{title}".
+
+Tes réponses sont LUES À VOIX HAUTE par une synthèse vocale :
+- Réponds de façon brève et naturelle, comme à l'oral (en général une à trois phrases).
+- N'utilise jamais de Markdown, de listes à puces, de tableaux, d'émojis ni de blocs de code.
+- Écris les nombres, unités et abréviations de façon à ce qu'ils se prononcent bien.
+- Si on te demande quelque chose de long, donne l'essentiel et propose de détailler.
+- Tu peux chercher sur le web pour l'actualité, la météo ou tout fait récent.
+
+Nous sommes le {today}."""
+
+# Fin de phrase : on envoie chaque phrase à la voix dès qu'elle est complète.
+_SENTENCE_END = re.compile(r"(?<=[.!?…:;])\s+")
+
+
+_DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+_MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
+           "août", "septembre", "octobre", "novembre", "décembre"]
+
+
+def _french_date(d: datetime.date) -> str:
+    return f"{_DAYS[d.weekday()]} {d.day} {_MONTHS[d.month - 1]} {d.year}"
+
+
+class Brain:
+    def __init__(self, owner: str = "Monsieur", title: str = "Monsieur", effort: str = "low"):
+        self.client = anthropic.Anthropic()
+        self.effort = effort
+        self.messages: list = []
+        today = _french_date(datetime.date.today())
+        self._last_stop_reason = None
+        self.system = SYSTEM_PROMPT.format(owner=owner, title=title, today=today)
+
+    def reset(self) -> None:
+        self.messages.clear()
+
+    def ask(self, text: str, on_sentence: Callable[[str], None]) -> str:
+        """Envoie `text` à Claude et appelle `on_sentence` pour chaque phrase reçue."""
+        self.messages.append({"role": "user", "content": text})
+        full = []
+        # pause_turn : une recherche web longue peut demander de relancer le tour.
+        for _ in range(5):
+            buffer = ""
+            for chunk in self._stream_turn():
+                buffer += chunk
+                full.append(chunk)
+                parts = _SENTENCE_END.split(buffer)
+                for sentence in parts[:-1]:
+                    if sentence.strip():
+                        on_sentence(sentence.strip())
+                buffer = parts[-1]
+            if buffer.strip():
+                on_sentence(buffer.strip())
+            if self._last_stop_reason != "pause_turn":
+                break
+        if self._last_stop_reason == "refusal":
+            msg = "Je crains de ne pas pouvoir répondre à cela."
+            on_sentence(msg)
+            return msg
+        return "".join(full)
+
+    def _stream_turn(self) -> Iterator[str]:
+        with self.client.beta.messages.stream(
+            model=MODEL,
+            max_tokens=16000,
+            system=self.system,
+            messages=self.messages,
+            thinking={"type": "adaptive"},
+            output_config={"effort": self.effort},
+            tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 3}],
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+            cache_control={"type": "ephemeral"},
+        ) as stream:
+            yield from stream.text_stream
+            final = stream.get_final_message()
+        self._last_stop_reason = final.stop_reason
+        if final.stop_reason == "refusal":
+            # On retire la question refusée pour que la conversation reste valide.
+            self.messages.pop()
+            return
+        # On renvoie le contenu complet (blocs de réflexion, recherches...) tel quel.
+        self.messages.append({"role": "assistant", "content": final.content})
