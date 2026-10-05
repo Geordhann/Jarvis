@@ -39,15 +39,52 @@ $env:ANTHROPIC_API_KEY="sk-ant-..."
 ## Lancer Jarvis
 
 ```bash
-python -m jarvis                 # tu parles, il répond à voix haute
-python -m jarvis --eveil         # il ne réagit que si tu dis « Jarvis, … »
+python -m jarvis                 # il attend que tu dises « Jarvis, … »
+python -m jarvis --toujours      # il répond à tout ce que tu dis, sans « Jarvis »
 python -m jarvis --texte         # tu écris au clavier, il répond à voix haute
 python -m jarvis --nom Geordhann --titre Patron
 ```
 
+### Lui parler
+
+Jarvis reste **silencieux en veille** et ne répond que quand tu commences par « Jarvis » :
+
+- « Jarvis, donne-moi l'heure » → réponse immédiate
+- « Jarvis, on est quel jour ? »
+- « Jarvis, quel temps fera-t-il demain à Lyon ? » → il cherche sur le web
+- « Jarvis, explique-moi les trous noirs »
+- « Jarvis » tout seul → « Oui, Monsieur ? » et il t'écoute
+
+Après chaque réponse, tu as **8 secondes** pour enchaîner une autre question sans redire « Jarvis ».
+Ensuite il se remet en veille.
+
 Phrases spéciales :
-- « **Au revoir** » / « Bonne nuit » → éteint Jarvis
-- « **Nouvelle conversation** » / « Oublie tout » → efface la mémoire de la conversation
+- « Jarvis, **au revoir** » / « bonne nuit » → éteint Jarvis
+- « Jarvis, **nouvelle conversation** » / « oublie tout » → efface la mémoire de la conversation
+- « Jarvis, **change de voix** » → il te dit quelles voix il connaît
+- « Jarvis, **prends la voix de Denise** » → il change de voix (le choix est mémorisé)
+
+## Choisir sa voix
+
+```bash
+python -m jarvis --choisir-voix   # écoute chaque voix et garde celle qui te plaît
+python -m jarvis --liste-voix     # affiche la liste
+python -m jarvis --voix Denise    # pour une seule session
+```
+
+| Voix | Style |
+|---|---|
+| Henri | homme, France, posé (par défaut) |
+| Rémy | homme, France, chaleureux |
+| Denise | femme, France, claire |
+| Éloïse | femme, France, jeune |
+| Vivienne | femme, France, douce |
+| Antoine, Jean, Thierry | hommes, Québec |
+| Sylvie | femme, Québec |
+| Gérard / Charline | homme / femme, Belgique |
+| Fabrice / Ariane | homme / femme, Suisse |
+
+Le choix est enregistré dans `~/.jarvis.json` et repris au prochain lancement.
 
 ## Options
 
@@ -55,9 +92,10 @@ Phrases spéciales :
 |---|---|---|
 | `--nom` | `JARVIS_OWNER` | ton prénom |
 | `--titre` | `JARVIS_TITLE` | comment il t'appelle (défaut : « Monsieur ») |
-| `--voix` | `JARVIS_VOICE` | voix edge-tts : `fr-FR-HenriNeural` (défaut), `fr-FR-RemyMultilingualNeural`, `fr-FR-DeniseNeural`, `fr-CA-AntoineNeural`… |
+| `--voix` | `JARVIS_VOICE` | prénom de la voix (`Henri`, `Denise`…) ou n'importe quel identifiant edge-tts |
 | `--effort` | `JARVIS_EFFORT` | réflexion : `low` (rapide, défaut) → `max` (plus réfléchi, plus lent) |
-| `--eveil` | | mode mot d'éveil « Jarvis » |
+| `--toujours` | | répond à tout, sans attendre « Jarvis » |
+| `--choisir-voix` | | menu pour écouter et choisir la voix |
 | `--texte` | | saisie au clavier |
 | `--muet` | | réponses affichées seulement |
 
@@ -69,6 +107,7 @@ Liste de toutes les voix : `edge-tts --list-voices`.
 |---|---|
 | `jarvis/brain.py` | conversation avec Claude en streaming, personnalité de Jarvis, recherche web |
 | `jarvis/ears.py` | écoute du micro + reconnaissance vocale (Google Web Speech, français) |
+| `jarvis/voices.py` | catalogue des voix et mémorisation du choix |
 | `jarvis/voice.py` | voix neuronale edge-tts, lue phrase par phrase pendant que Claude écrit ; repli hors-ligne pyttsx3 |
 | `jarvis/__main__.py` | la boucle écoute → réflexion → parole |
 

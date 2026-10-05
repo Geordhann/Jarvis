@@ -18,12 +18,15 @@ class Ears:
             print("Calibrage du micro, silence s'il vous plaît…")
             self.recognizer.adjust_for_ambient_noise(source, duration=1)
 
-    def listen(self) -> str | None:
-        """Écoute une phrase et renvoie le texte reconnu (ou None si rien compris)."""
+    def listen(self, timeout: float | None = None) -> str | None:
+        """Écoute une phrase et renvoie le texte reconnu (ou None si rien compris).
+
+        `timeout` : secondes d'attente maximum avant que quelqu'un commence à parler.
+        """
         sr = self.sr
         with self.microphone as source:
             try:
-                audio = self.recognizer.listen(source, timeout=None, phrase_time_limit=20)
+                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=20)
             except sr.WaitTimeoutError:
                 return None
         try:

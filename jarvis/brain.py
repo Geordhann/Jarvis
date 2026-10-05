@@ -20,7 +20,7 @@ Tes réponses sont LUES À VOIX HAUTE par une synthèse vocale :
 - Si on te demande quelque chose de long, donne l'essentiel et propose de détailler.
 - Tu peux chercher sur le web pour l'actualité, la météo ou tout fait récent.
 
-Nous sommes le {today}."""
+Chaque message commence par la date et l'heure locales entre crochets : sers-t'en pour l'heure, la date ou les durées."""
 
 # Fin de phrase : on envoie chaque phrase à la voix dès qu'elle est complète.
 _SENTENCE_END = re.compile(r"(?<=[.!?…:;])\s+")
@@ -31,8 +31,14 @@ _MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
            "août", "septembre", "octobre", "novembre", "décembre"]
 
 
-def _french_date(d: datetime.date) -> str:
+def french_date(d: datetime.date) -> str:
     return f"{_DAYS[d.weekday()]} {d.day} {_MONTHS[d.month - 1]} {d.year}"
+
+
+def french_time(t: datetime.datetime) -> str:
+    if t.minute == 0:
+        return f"{t.hour} heures" if t.hour > 1 else f"{t.hour} heure"
+    return f"{t.hour} h {t.minute:02d}"
 
 
 class Brain:
@@ -40,16 +46,17 @@ class Brain:
         self.client = anthropic.Anthropic()
         self.effort = effort
         self.messages: list = []
-        today = _french_date(datetime.date.today())
         self._last_stop_reason = None
-        self.system = SYSTEM_PROMPT.format(owner=owner, title=title, today=today)
+        self.system = SYSTEM_PROMPT.format(owner=owner, title=title)
 
     def reset(self) -> None:
         self.messages.clear()
 
     def ask(self, text: str, on_sentence: Callable[[str], None]) -> str:
         """Envoie `text` à Claude et appelle `on_sentence` pour chaque phrase reçue."""
-        self.messages.append({"role": "user", "content": text})
+        now = datetime.datetime.now()
+        stamp = f"[{french_date(now.date())}, {french_time(now)}]"
+        self.messages.append({"role": "user", "content": f"{stamp}\n{text}"})
         full = []
         # pause_turn : une recherche web longue peut demander de relancer le tour.
         for _ in range(5):
