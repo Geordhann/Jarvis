@@ -42,7 +42,7 @@ def install() -> Path:
             'Set shell = CreateObject("WScript.Shell")\r\n'
             f'shell.CurrentDirectory = "{PROJECT_DIR}"\r\n'
             f'shell.Run "{command}", 0, False\r\n',
-            encoding="utf-16",  # avec BOM : Windows lit bien les chemins accentués
+            encoding="utf-16", newline="",  # avec BOM : Windows lit bien les chemins accentués
         )
     elif sys.platform == "darwin":
         with open(target, "wb") as f:
