@@ -1,70 +1,73 @@
-"""La voix de Jarvis : synthèse vocale jouée phrase par phrase."""
+"""La voix de Jarvis sur l'ordinateur : phrases synthétisées puis jouées dans l'ordre."""
 
 from __future__ import annotations
 
-import asyncio
 import os
 import queue
 import tempfile
 import threading
 
-DEFAULT_VOICE = "fr-FR-HenriNeural"
+from . import tts
 
 
 class Voice:
-    """File d'attente de phrases lues dans l'ordre par un thread dédié.
+    """Deux threads : l'un prépare l'audio de la phrase suivante pendant que l'autre joue
+    la phrase en cours, pour enchaîner sans blanc. Repli hors-ligne sur pyttsx3."""
 
-    Utilise edge-tts (voix neuronales Microsoft, gratuites, nécessite Internet)
-    et retombe sur pyttsx3 (hors-ligne, voix du système) en cas d'échec.
-    """
-
-    def __init__(self, voice: str = DEFAULT_VOICE, rate: str = "+5%", muted: bool = False):
-        self.voice = voice
-        self.rate = rate
+    def __init__(self, voice: str | None = None, muted: bool = False):
+        self.voice = voice  # prénom ou identifiant ; None = voix enregistrée / par défaut
         self.muted = muted
-        self._queue: queue.Queue[str | None] = queue.Queue()
+        self._texts: queue.Queue[str] = queue.Queue()
+        self._audio: queue.Queue[tuple[str, bytes | None]] = queue.Queue()
         self._engine = None
         self._mixer_ready = False
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+        threading.Thread(target=self._synth_loop, daemon=True).start()
+        threading.Thread(target=self._play_loop, daemon=True).start()
 
     def say(self, text: str) -> None:
         print(f"JARVIS › {text}", flush=True)
         if not self.muted:
-            self._queue.put(text)
+            self._texts.put(text)
 
     def wait(self) -> None:
         """Bloque jusqu'à ce que tout ce qui est en file ait été prononcé."""
-        self._queue.join()
+        self._texts.join()
+        self._audio.join()
 
-    def _run(self) -> None:
+    def _synth_loop(self) -> None:
         while True:
-            text = self._queue.get()
+            text = self._texts.get()
             try:
-                if text:
-                    self._speak(text)
+                audio = tts.synthesize(text, self.voice)
+            except Exception as exc:
+                print(f"[voix] synthèse impossible ({exc}), voix hors-ligne.")
+                audio = None
+            self._audio.put((text, audio))
+            self._texts.task_done()
+
+    def _play_loop(self) -> None:
+        while True:
+            text, audio = self._audio.get()
+            try:
+                if audio:
+                    self._play_mp3(audio)
+                else:
+                    self._speak_offline(text)
             except Exception as exc:  # la voix ne doit jamais faire planter Jarvis
                 print(f"[voix] erreur : {exc}")
             finally:
-                self._queue.task_done()
+                self._audio.task_done()
 
-    def _speak(self, text: str) -> None:
-        try:
-            self._speak_edge(text)
-        except Exception:
-            self._speak_offline(text)
-
-    def _speak_edge(self, text: str) -> None:
-        import edge_tts
+    def _play_mp3(self, audio: bytes) -> None:
         import pygame
 
         if not self._mixer_ready:
             pygame.mixer.init()
             self._mixer_ready = True
         fd, path = tempfile.mkstemp(suffix=".mp3")
-        os.close(fd)
         try:
-            asyncio.run(edge_tts.Communicate(text, self.voice, rate=self.rate).save(path))
+            with os.fdopen(fd, "wb") as f:
+                f.write(audio)
             pygame.mixer.music.load(path)
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():

@@ -1,6 +1,15 @@
+# Cerveau
 anthropic>=1.11
+# Voix et écoute sur l'ordinateur
 edge-tts
 pygame
 SpeechRecognition
 PyAudio
 pyttsx3
+requests
+# Gmail et Google Agenda
+google-api-python-client
+google-auth-oauthlib
+# Telegram, WhatsApp et interface
+python-telegram-bot>=21
+aiohttp

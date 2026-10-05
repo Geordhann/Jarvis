@@ -1,14 +1,29 @@
-"""Catalogue des voix françaises et sauvegarde du choix de l'utilisateur."""
+"""Catalogue des voix : ElevenLabs (réalistes, payantes au-delà de l'offre gratuite) et edge-tts (gratuites)."""
 
 from __future__ import annotations
 
+import re
 import unicodedata
 
 from . import config
 
-# Prénom (tel qu'on le prononce) -> (identifiant edge-tts, description)
-VOICES: dict[str, tuple[str, str]] = {
-    "Henri": ("fr-FR-HenriNeural", "homme, France, posé — voix par défaut"),
+# Voix ElevenLabs prêtes à l'emploi : elles parlent toutes français avec le modèle multilingue.
+# Prénom -> (identifiant ElevenLabs, description)
+ELEVEN_VOICES: dict[str, tuple[str, str]] = {
+    "Daniel": ("onwK4e9ZLuTAKqWW03F9", "homme, britannique, posé — le plus « Jarvis »"),
+    "George": ("JBFqnCBsd6RMkjVDRZzb", "homme, chaleureux, conteur"),
+    "Brian": ("nPczCjzI2devNBz1zQrb", "homme, grave, rassurant"),
+    "Adam": ("pNInz6obpgDQGcFmaJgB", "homme, grave"),
+    "Antoni": ("ErXwobaYiN019PkySvjV", "homme, doux"),
+    "Charlotte": ("XB0fDUnXU5powFXDhCwa", "femme, séduisante"),
+    "Sarah": ("EXAVITQu4vr4xnSDxMaL", "femme, douce, professionnelle"),
+    "Lily": ("pFZP5JQG7iQjIQuC4Bku", "femme, britannique, chaleureuse"),
+    "Rachel": ("21m00Tcm4TlvDq8ikWAM", "femme, calme"),
+}
+
+# Voix edge-tts (Microsoft), gratuites et illimitées.
+EDGE_VOICES: dict[str, tuple[str, str]] = {
+    "Henri": ("fr-FR-HenriNeural", "homme, France, posé"),
     "Rémy": ("fr-FR-RemyMultilingualNeural", "homme, France, chaleureux"),
     "Denise": ("fr-FR-DeniseNeural", "femme, France, claire"),
     "Éloïse": ("fr-FR-EloiseNeural", "femme, France, jeune"),
@@ -23,7 +38,18 @@ VOICES: dict[str, tuple[str, str]] = {
     "Ariane": ("fr-CH-ArianeNeural", "femme, Suisse"),
 }
 
-DEFAULT_VOICE_NAME = "Henri"
+
+def has_elevenlabs() -> bool:
+    return bool(config.get("elevenlabs_cle"))
+
+
+def catalog() -> dict[str, tuple[str, str]]:
+    """Les voix utilisables : ElevenLabs seulement si une clé est configurée."""
+    return {**(ELEVEN_VOICES if has_elevenlabs() else {}), **EDGE_VOICES}
+
+
+def default_voice() -> str:
+    return "Daniel" if has_elevenlabs() else "Henri"
 
 
 def _plain(text: str) -> str:
@@ -32,22 +58,35 @@ def _plain(text: str) -> str:
 
 
 def find_voice(text: str) -> str | None:
-    """Trouve un prénom de voix (ou un identifiant edge-tts) dans `text`."""
+    """Trouve un prénom de voix (ou un identifiant) dans `text`."""
     plain = _plain(text)
-    for name, (voice_id, _) in VOICES.items():
-        if _plain(name) in plain.split() or voice_id.lower() in plain:
+    words = set(re.split(r"[^\w-]+", plain))
+    for name, (voice_id, _) in catalog().items():
+        if _plain(name) in words or voice_id.lower() in plain:
             return name
     return None
 
 
-def voice_id(name_or_id: str) -> str:
-    """Accepte un prénom du catalogue ou directement un identifiant edge-tts."""
-    name = find_voice(name_or_id)
-    return VOICES[name][0] if name else name_or_id
+def resolve(name_or_id: str | None) -> tuple[str, str]:
+    """(fournisseur, identifiant) pour un prénom ou un identifiant de voix."""
+    name = find_voice(name_or_id or "")
+    if name is None and not name_or_id:
+        name = default_voice()
+    if name in ELEVEN_VOICES and has_elevenlabs():
+        return "elevenlabs", ELEVEN_VOICES[name][0]
+    if name in EDGE_VOICES:
+        return "edge", EDGE_VOICES[name][0]
+    # Identifiant inconnu : une voix edge-tts (« fr-FR-… ») ou une voix ElevenLabs perso.
+    if name_or_id and re.fullmatch(r"[a-z]{2}-[A-Z]{2}-\w+", name_or_id):
+        return "edge", name_or_id
+    if name_or_id and has_elevenlabs():
+        return "elevenlabs", name_or_id
+    return "edge", EDGE_VOICES["Henri"][0]
 
 
 def describe(name: str) -> str:
-    return f"{name} ({VOICES[name][1]})"
+    provider = "ElevenLabs" if name in ELEVEN_VOICES else "gratuite"
+    return f"{name} ({catalog()[name][1]}, {provider})"
 
 
 def load_saved_voice() -> str | None:

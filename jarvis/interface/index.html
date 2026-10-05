@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J.A.R.V.I.S.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #04090f;
+    --bg-2: #08131d;
+    --panel: rgba(12, 30, 44, 0.72);
+    --line: rgba(80, 200, 255, 0.18);
+    --line-strong: rgba(80, 200, 255, 0.45);
+    --cyan: #4fd6ff;
+    --cyan-soft: rgba(79, 214, 255, 0.14);
+    --amber: #ffb547;
+    --text: #d8eef8;
+    --muted: #7d9aab;
+    --ok: #4fe3a1;
+    --off: #5d6b75;
+    --danger: #ff6b6b;
+    --level: 0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { height: 100vh; }
+  body {
+    background:
+      radial-gradient(ellipse at 50% 30%, #0b2233 0%, transparent 60%),
+      repeating-linear-gradient(0deg, transparent 0 39px, rgba(79,214,255,.035) 39px 40px),
+      repeating-linear-gradient(90deg, transparent 0 39px, rgba(79,214,255,.035) 39px 40px),
+      var(--bg);
+    color: var(--text);
+    font: 15px/1.5 Inter, system-ui, sans-serif;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: "top top" "main side" "input side";
+    gap: 16px;
+    padding: 16px;
+  }
+  header { grid-area: top; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .brand { font-family: Orbitron, sans-serif; letter-spacing: .35em; font-weight: 700; color: var(--cyan); font-size: 18px; }
+  .brand small { display: block; letter-spacing: .2em; font-size: 10px; color: var(--muted); font-weight: 500; }
+  .clock { font-family: Orbitron, sans-serif; color: var(--muted); font-size: 13px; letter-spacing: .1em; text-align: right; }
+
+  main { grid-area: main; display: flex; flex-direction: column; min-height: 0; }
+  .core { display: flex; flex-direction: column; align-items: center; padding: 8px 0 12px; }
+  .reactor { width: min(240px, 52vw); aspect-ratio: 1; position: relative; cursor: pointer; }
+  .reactor svg { width: 100%; height: 100%; overflow: visible; }
+  .ring { fill: none; stroke: var(--cyan); transform-origin: 100px 100px; }
+  .r1 { stroke-width: 1.5; stroke-dasharray: 4 6; opacity: .6; animation: spin 24s linear infinite; }
+  .r2 { stroke-width: 6; stroke-dasharray: 40 18; opacity: .35; animation: spin 14s linear infinite reverse; }
+  .r3 { stroke-width: 2; stroke-dasharray: 120 30 10 30; opacity: .8; animation: spin 9s linear infinite; }
+  .core-disc { fill: url(#glow); transform-origin: 100px 100px;
+               transform: scale(calc(.82 + var(--level) * .35)); transition: transform .08s linear; }
+  .reactor::after { content: ""; position: absolute; inset: 18%; border-radius: 50%;
+                    box-shadow: 0 0 calc(30px + var(--level) * 90px) rgba(79,214,255,calc(.25 + var(--level) * .5)); pointer-events: none; }
+  body[data-state="thinking"] .r3 { animation-duration: 1.6s; }
+  body[data-state="thinking"] .r2 { animation-duration: 3s; }
+  body[data-state="listening"] .ring { stroke: var(--amber); }
+  body[data-state="listening"] .core-disc { fill: url(#glow-amber); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .state { margin-top: 10px; font-family: Orbitron, sans-serif; font-size: 12px; letter-spacing: .3em; color: var(--muted); text-transform: uppercase; }
+  .state b { color: var(--cyan); font-weight: 500; }
+  body[data-state="listening"] .state b { color: var(--amber); }
+
+  .log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 4px 8px;
+         mask-image: linear-gradient(to bottom, transparent 0, #000 24px); }
+  .msg { max-width: 80%; padding: 10px 14px; border-radius: 4px; border: 1px solid var(--line); background: var(--panel); white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; border-color: rgba(255,181,71,.3); background: rgba(255,181,71,.06); }
+  .msg.jarvis { align-self: flex-start; border-left: 2px solid var(--cyan); }
+  .msg.error { border-left-color: var(--danger); }
+  .tool { align-self: flex-start; font-size: 12px; color: var(--muted); letter-spacing: .04em; padding-left: 4px; }
+  .tool::before { content: "◆ "; color: var(--cyan); }
+
+  form { grid-area: input; display: flex; gap: 10px; }
+  input[type=text] { flex: 1; min-width: 0; background: var(--panel); border: 1px solid var(--line-strong); color: var(--text);
+                     padding: 12px 14px; border-radius: 4px; font: inherit; outline: none; }
+  input[type=text]:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px var(--cyan-soft); }
+  button { font: 600 13px Inter, sans-serif; letter-spacing: .06em; color: var(--text); background: var(--panel);
+           border: 1px solid var(--line-strong); border-radius: 4px; padding: 0 16px; cursor: pointer; min-height: 44px; }
+  button:hover { border-color: var(--cyan); }
+  button.primary { background: var(--cyan); color: #032; border-color: var(--cyan); }
+  #mic { width: 48px; padding: 0; display: grid; place-items: center; }
+  #mic.on { background: var(--amber); border-color: var(--amber); color: #321; }
+
+  aside { grid-area: side; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 14px; }
+  .card h2 { margin: 0 0 10px; font: 500 11px Orbitron, sans-serif; letter-spacing: .25em; color: var(--muted); text-transform: uppercase; }
+  select { width: 100%; background: var(--bg-2); color: var(--text); border: 1px solid var(--line-strong); border-radius: 4px; padding: 10px; font: inherit; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; font-size: 14px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--off); flex: none; }
+  .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .switch { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; }
+  .switch input { width: 18px; height: 18px; accent-color: var(--cyan); }
+  .hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+  .wide { width: 100%; }
+
+  @media (max-width: 760px) {
+    body { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "main" "input" "side"; height: auto; min-height: 100%; }
+    main { min-height: 60vh; }
+    .msg { max-width: 92%; }
+    header { flex-wrap: wrap; }
+    .clock { font-size: 11px; }
+    .brand { font-size: 16px; }
+  }
+</style>
+</head>
+<body data-state="idle">
+<header>
+  <div class="brand">J.A.R.V.I.S.<small>Assistant personnel</small></div>
+  <div class="clock" id="clock"></div>
+</header>
+
+<main>
+  <div class="core">
+    <div class="reactor" id="reactor" title="Cliquer pour parler">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <defs>
+          <radialGradient id="glow"><stop offset="0" stop-color="#e8fbff"/><stop offset=".35" stop-color="#4fd6ff"/><stop offset="1" stop-color="#4fd6ff" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow-amber"><stop offset="0" stop-color="#fff4df"/><stop offset=".35" stop-color="#ffb547"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></radialGradient>
+        </defs>
+        <circle class="ring r1" cx="100" cy="100" r="96"/>
+        <circle class="ring r2" cx="100" cy="100" r="80"/>
+        <circle class="ring r3" cx="100" cy="100" r="64"/>
+        <circle class="core-disc" cx="100" cy="100" r="44"/>
+      </svg>
+    </div>
+    <div class="state">Statut : <b id="state">en veille</b></div>
+  </div>
+  <div class="log" id="log" aria-live="polite"></div>
+</main>
+
+<form id="form" autocomplete="off">
+  <button type="button" id="mic" aria-label="Parler">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+  </button>
+  <input type="text" id="input" placeholder="Écrivez à Jarvis…">
+  <button class="primary" type="submit">Envoyer</button>
+</form>
+
+<aside>
+  <div class="card">
+    <h2>Écoute</h2>
+    <label class="switch"><input type="checkbox" id="handsfree"> Mains libres : dire « Jarvis… »</label>
+    <p class="hint" id="speech-hint">Le micro de cette page fonctionne dans Chrome et Edge.</p>
+  </div>
+  <div class="card">
+    <h2>Voix</h2>
+    <select id="voice"></select>
+    <button type="button" class="wide" id="test-voice" style="margin-top:10px">Écouter</button>
+  </div>
+  <div class="card">
+    <h2>Connexions</h2>
+    <div id="links"></div>
+    <p class="hint">À configurer avec <code>python -m jarvis --configurer</code></p>
+  </div>
+  <button type="button" id="reset">Nouvelle conversation</button>
+</aside>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const api = (path, body) => fetch(path, {
+  method: body === undefined ? "GET" : "POST",
+  headers: { "Content-Type": "application/json", "X-Jarvis": "1" },
+  body: body === undefined ? undefined : JSON.stringify(body),
+});
+
+const TOOL_LABELS = {
+  chercher_mails: "Recherche dans vos mails", lire_mail: "Lecture d'un mail", envoyer_mail: "Envoi du mail",
+  creer_brouillon: "Brouillon enregistré", agenda_evenements: "Consultation de l'agenda",
+  creer_evenement: "Ajout à l'agenda", memory: "Mémoire", lire_skill: "Lecture d'une skill",
+  ouvrir_page: "Ouverture d'une page", rechercher_dans_navigateur: "Recherche dans le navigateur",
+};
+
+// --- état & horloge ------------------------------------------------------
+const STATES = { idle: "en veille", listening: "écoute", thinking: "réflexion", speaking: "parole" };
+function setState(s) { document.body.dataset.state = s; $("state").textContent = STATES[s]; }
+function tick() {
+  const d = new Date();
+  $("clock").textContent = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }).toUpperCase()
+    + " · " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+tick(); setInterval(tick, 10000);
+
+function addMessage(cls, text) {
+  const el = document.createElement("div");
+  el.className = cls; el.textContent = text;
+  $("log").appendChild(el); el.scrollIntoView({ block: "end" });
+  return el;
+}
+
+// --- voix : lecture phrase par phrase, réacteur synchronisé ---------------
+const audio = new Audio();
+let analyser, levelData;
+function connectAnalyser() {
+  if (analyser) return;
+  try {
+    const ctx = new AudioContext();
+    const src = ctx.createMediaElementSource(audio);
+    analyser = ctx.createAnalyser(); analyser.fftSize = 256;
+    src.connect(analyser); analyser.connect(ctx.destination);
+    levelData = new Uint8Array(analyser.frequencyBinCount);
+  } catch (e) { /* pas d'animation, la voix fonctionne quand même */ }
+}
+(function animate() {
+  let level = 0;
+  if (analyser && !audio.paused) {
+    analyser.getByteFrequencyData(levelData);
+    level = Math.min(1, levelData.reduce((a, b) => a + b, 0) / levelData.length / 90);
+  }
+  document.documentElement.style.setProperty("--level", level.toFixed(3));
+  requestAnimationFrame(animate);
+})();
+
+const speechQueue = [];
+let playing = false;
+function speak(text) {
+  // On lance la synthèse tout de suite pour que la phrase suivante soit prête à temps.
+  const clip = api("/api/voix/lire", { text }).then(r => r.ok ? r.blob() : null).catch(() => null);
+  speechQueue.push(clip);
+  if (!playing) playNext();
+}
+async function playNext() {
+  const next = speechQueue.shift();
+  if (!next) { playing = false; if (document.body.dataset.state === "speaking") setState("idle"); onSpeechEnd(); return; }
+  playing = true;
+  const blob = await next;
+  if (!blob) return playNext();
+  connectAnalyser();
+  setState("speaking");
+  audio.src = URL.createObjectURL(blob);
+  audio.onended = () => { URL.revokeObjectURL(audio.src); playNext(); };
+  audio.play().catch(() => playNext());
+}
+
+// --- envoi d'un message --------------------------------------------------
+let busy = false;
+async function send(text) {
+  text = text.trim();
+  if (!text || busy) return;
+  busy = true;
+  addMessage("msg user", text);
+  setState("thinking");
+  let bubble = null;
+  try {
+    const res = await api("/api/message", { text });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n"); buffer = lines.pop();
+      for (const line of lines) {
+        if (!line) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "sentence") {
+          if (!bubble) bubble = addMessage("msg jarvis", ev.text);
+          else bubble.textContent += " " + ev.text;
+          bubble.scrollIntoView({ block: "end" });
+          speak(ev.text);
+        } else if (ev.type === "tool") {
+          addMessage("tool", (TOOL_LABELS[ev.name] || ev.name) + "…");
+          bubble = null;
+        } else if (ev.type === "error") {
+          addMessage("msg jarvis error", ev.text);
+        }
+      }
+    }
+  } catch (e) {
+    addMessage("msg jarvis error", "Je n'arrive pas à joindre le programme Jarvis sur cet ordinateur.");
+  }
+  busy = false;
+  if (!playing) { setState("idle"); onSpeechEnd(); }
+}
+
+$("form").addEventListener("submit", (e) => { e.preventDefault(); send($("input").value); $("input").value = ""; });
+
+// --- micro (reconnaissance vocale du navigateur) ------------------------
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recog = null, listening = false, wakeOnly = false;
+const WAKE = /\b(jarvis|jarvi|jervis|djarvis)\b[\s,.!?]*/i;
+
+if (!Recognition) {
+  $("mic").disabled = true; $("handsfree").disabled = true;
+  $("speech-hint").textContent = "Ce navigateur ne gère pas la reconnaissance vocale : utilisez Chrome ou Edge, ou écrivez.";
+}
+
+function startListening(handsfree) {
+  if (!Recognition || listening || busy || playing) return;
+  wakeOnly = handsfree;
+  recog = new Recognition();
+  recog.lang = "fr-FR"; recog.interimResults = false; recog.continuous = handsfree;
+  recog.onresult = (e) => {
+    const said = e.results[e.results.length - 1][0].transcript.trim();
+    if (!wakeOnly) return send(said);
+    const m = said.match(WAKE);
+    if (!m) return;  // en veille : on ignore tout ce qui ne commence pas par « Jarvis »
+    const request = said.slice(m.index + m[0].length).trim();
+    recog.stop();
+    if (request) send(request);
+    else { speak("Oui ?"); wakeOnly = false; pendingFollowUp = true; }
+  };
+  recog.onend = () => {
+    listening = false; $("mic").classList.remove("on");
+    if (document.body.dataset.state === "listening") setState("idle");
+    if ($("handsfree").checked && !busy && !playing) setTimeout(() => startListening(true), 300);
+  };
+  recog.onerror = (e) => { if (e.error === "not-allowed") { $("handsfree").checked = false; addMessage("msg jarvis error", "Autorisez le micro pour cette page."); } };
+  recog.start();
+  listening = true; $("mic").classList.add("on");
+  if (!handsfree) setState("listening");
+}
+
+let pendingFollowUp = false;
+function onSpeechEnd() {
+  // Après « Oui ? », on écoute la demande sans exiger « Jarvis ».
+  if (pendingFollowUp) { pendingFollowUp = false; return startListening(false); }
+  if ($("handsfree").checked) startListening(true);
+}
+
+$("mic").addEventListener("click", () => listening ? recog.stop() : startListening(false));
+$("reactor").addEventListener("click", () => listening ? recog.stop() : startListening(false));
+$("handsfree").addEventListener("change", (e) => {
+  try { localStorage.setItem("jarvis-handsfree", e.target.checked ? "1" : "0"); } catch (_) {}
+  if (e.target.checked) startListening(true); else if (recog) recog.stop();
+});
+
+// --- réglages ------------------------------------------------------------
+async function loadStatus() {
+  try {
+    const s = await (await api("/api/etat")).json();
+    $("voice").innerHTML = "";
+    for (const v of s.voix_disponibles) {
+      const o = document.createElement("option");
+      o.value = v.nom; o.textContent = v.description; o.selected = v.nom === s.voix;
+      $("voice").appendChild(o);
+    }
+    $("links").innerHTML = "";
+    for (const [name, on] of Object.entries(s.connexions)) {
+      const row = document.createElement("div"); row.className = "row";
+      row.innerHTML = `<span></span><span class="dot ${on ? "on" : ""}" title="${on ? "connecté" : "non configuré"}"></span>`;
+      row.firstChild.textContent = name;
+      $("links").appendChild(row);
+    }
+  } catch (e) { /* serveur pas encore prêt */ }
+}
+$("voice").addEventListener("change", async (e) => {
+  await api("/api/voix/choisir", { nom: e.target.value });
+  speak(`Voici ma nouvelle voix. Je m'appelle toujours Jarvis.`);
+});
+$("test-voice").addEventListener("click", () => speak("Bonjour. Tous les systèmes sont opérationnels."));
+$("reset").addEventListener("click", async () => {
+  await api("/api/nouveau", {});
+  $("log").innerHTML = "";
+  addMessage("msg jarvis", "C'est oublié. On repart de zéro.");
+});
+
+loadStatus();
+try {
+  if (localStorage.getItem("jarvis-handsfree") === "1" && Recognition) { $("handsfree").checked = true; startListening(true); }
+} catch (_) {}
+addMessage("msg jarvis", "Bonjour. Tous les systèmes sont opérationnels. Écrivez-moi, cliquez sur le réacteur pour parler, ou activez le mode mains libres.");
+</script>
+</body>
+</html>

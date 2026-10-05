@@ -7,22 +7,20 @@ import datetime
 import os
 import re
 import sys
+import threading
 import time
 import unicodedata
 
 import anthropic
 
-from . import autostart, config, voices
-from .brain import MODELS, Brain, french_date, french_time
+from . import autostart, config, profile, services, sessions, voices
+from .agent import MODELS, french_date, french_time
 from .voice import Voice
 
 # La reconnaissance vocale écrit parfois « Jarvis » de travers.
 WAKE_RE = re.compile(r"\b(jarvis|jarvi|jarvice|jarviss|jervis|djarvis|jarwis)\b[\s,.!?]*")
 # Après une réponse, on peut enchaîner une question sans redire « Jarvis » pendant ce délai.
 FOLLOW_UP_SECONDS = 8
-# Sans question pendant ce délai, Jarvis oublie la conversation : chaque question
-# renvoie tout l'historique à Claude, donc l'effacer garde les coûts bas.
-FORGET_AFTER_SECONDS = 10 * 60
 
 STOP_WORDS = ("au revoir", "bonne nuit", "eteins-toi", "eteins toi", "arrete-toi", "quitter", "exit")
 RESET_WORDS = ("nouvelle conversation", "oublie tout")
@@ -49,15 +47,18 @@ def strip_wake_word(text: str) -> str | None:
 
 
 class Jarvis:
+    """L'assistant vocal sur l'ordinateur : micro -> agent -> haut-parleurs."""
+
     def __init__(self, args: argparse.Namespace):
-        self.title = args.titre
+        self.title = config.get("titre", "Monsieur")
         self.always_listen = args.toujours
-        self.brain = Brain(owner=args.nom, title=args.titre, effort=args.effort, model=args.modele)
-        self.voice_name = voices.find_voice(args.voix) or args.voix
-        self.voice = Voice(voice=voices.voice_id(args.voix), muted=args.muet)
+        self.voice = Voice(voice=args.voix, muted=args.muet)
         self.ears = None if args.texte else _init_ears(retry=args.fond)
         self.awake_until = 0.0
-        self.last_request = time.monotonic()
+
+    @property
+    def agent(self):
+        return sessions.get("voix", "voix")
 
     # --- boucle principale -------------------------------------------------
 
@@ -123,16 +124,12 @@ class Jarvis:
             self.voice.say(f"À votre service, {self.title}. Bonne journée.")
             return False
         if any(w in plain for w in RESET_WORDS):
-            self.brain.reset()
+            sessions.reset("voix")
             self.voice.say("C'est oublié. On repart de zéro.")
             return True
         if self._handle_voice(request, plain):
             return True
-        if time.monotonic() - self.last_request > FORGET_AFTER_SECONDS:
-            self.brain.reset()
-        self.last_request = time.monotonic()
-
-        # Réponses instantanées, sans passer par Claude.
+        # Réponses instantanées et gratuites, sans passer par Claude.
         now = datetime.datetime.now()
         if TIME_RE.search(plain) and len(plain.split()) <= 8:
             self.voice.say(f"Il est {french_time(now)}, {self.title}.")
@@ -141,7 +138,7 @@ class Jarvis:
             self.voice.say(f"Nous sommes le {french_date(now.date())}.")
             return True
 
-        self._ask_claude(request)
+        self._ask_agent(request)
         return True
 
     def _handle_voice(self, request: str, plain: str) -> bool:
@@ -149,26 +146,22 @@ class Jarvis:
             return False
         name = voices.find_voice(request)
         if name:
-            self.set_voice(name)
+            self.voice.voice = name
+            voices.save_voice(name)
+            self.voice.say(f"Voici ma nouvelle voix, {self.title}. Je m'appelle toujours Jarvis.")
             return True
         if VOICE_LIST_RE.search(plain):
-            names = ", ".join(voices.VOICES)
+            names = ", ".join(voices.catalog())
             self.voice.say(f"Je peux prendre les voix suivantes : {names}. "
-                           f"Dites par exemple : Jarvis, prends la voix de Denise.")
+                           f"Dites par exemple : Jarvis, prends la voix de {voices.default_voice()}.")
             return True
         return False
 
-    def set_voice(self, name: str) -> None:
-        self.voice_name = name
-        self.voice.voice = voices.VOICES[name][0]
-        voices.save_voice(name)
-        self.voice.say(f"Voici ma nouvelle voix, {self.title}. Je m'appelle toujours Jarvis.")
-
-    def _ask_claude(self, request: str) -> None:
+    def _ask_agent(self, request: str) -> None:
         try:
-            self.brain.ask(request, on_sentence=self.voice.say)
+            self.agent.ask(request, on_sentence=self.voice.say)
         except anthropic.AuthenticationError:
-            self.voice.say("Ma clé d'accès à Claude est invalide. Vérifiez la variable ANTHROPIC_API_KEY.")
+            self.voice.say("Ma clé d'accès à Claude est invalide. Relancez la configuration.")
         except anthropic.RateLimitError:
             self.voice.say("Je suis un peu surchargé. Réessayez dans un instant.")
         except anthropic.APIStatusError as exc:
@@ -195,7 +188,7 @@ def _init_ears(retry: bool = False):
 
 def choose_voice_menu(muted: bool) -> None:
     """Menu interactif : écouter chaque voix et choisir celle de Jarvis."""
-    names = list(voices.VOICES)
+    names = list(voices.catalog())
     preview = Voice(muted=muted)
     while True:
         print("\nVoix disponibles :")
@@ -208,7 +201,7 @@ def choose_voice_menu(muted: bool) -> None:
             print("Numéro invalide.")
             continue
         name = names[int(choice) - 1]
-        preview.voice = voices.VOICES[name][0]
+        preview.voice = name
         preview.say(f"Bonjour, je suis Jarvis, avec la voix de {name}.")
         preview.wait()
         if input(f"Garder la voix de {name} ? (o/N) ").strip().lower() in ("o", "oui", "y"):
@@ -218,35 +211,34 @@ def choose_voice_menu(muted: bool) -> None:
 
 
 def main() -> None:
-    saved_voice = voices.load_saved_voice()
-    parser = argparse.ArgumentParser(description="JARVIS, ton assistant vocal personnel.")
-    parser.add_argument("--texte", action="store_true", help="écrire au clavier au lieu de parler")
-    parser.add_argument("--muet", action="store_true", help="ne pas lire les réponses à voix haute")
-    parser.add_argument("--toujours", action="store_true",
-                        help="répondre à tout ce qui est dit, sans attendre « Jarvis »")
-    parser.add_argument("--voix",
-                        default=os.getenv("JARVIS_VOICE") or saved_voice or voices.DEFAULT_VOICE_NAME,
-                        help="prénom de la voix (Henri, Denise, Rémy…) ou identifiant edge-tts")
-    parser.add_argument("--choisir-voix", action="store_true",
-                        help="écouter les voix disponibles et choisir celle de Jarvis")
-    parser.add_argument("--liste-voix", action="store_true", help="afficher les voix disponibles")
-    parser.add_argument("--titre", default=os.getenv("JARVIS_TITLE", "Monsieur"),
-                        help="comment Jarvis t'appelle")
-    parser.add_argument("--nom", default=os.getenv("JARVIS_OWNER", "Monsieur"), help="ton prénom")
-    parser.add_argument("--modele", default=os.getenv("JARVIS_MODEL") or config.get("modele") or "opus",
-                        help="opus (le plus intelligent), sonnet (2x moins cher), haiku (4x moins cher) "
-                             "ou un identifiant de modèle Claude ; mémorisé")
-    parser.add_argument("--cle", metavar="CLE_API",
-                        help="enregistrer ta clé API Anthropic (sk-ant-…) pour ne plus avoir à la donner")
-    parser.add_argument("--installer-demarrage", action="store_true",
-                        help="lancer Jarvis automatiquement à chaque démarrage de l'ordinateur")
-    parser.add_argument("--retirer-demarrage", action="store_true",
-                        help="ne plus lancer Jarvis au démarrage")
-    parser.add_argument("--fond", action="store_true",
-                        help="mode arrière-plan (utilisé au démarrage) : journal dans ~/.jarvis.log")
-    parser.add_argument("--effort", default=os.getenv("JARVIS_EFFORT", "low"),
-                        choices=["low", "medium", "high", "xhigh", "max"],
-                        help="profondeur de réflexion (low = plus rapide)")
+    parser = argparse.ArgumentParser(description="JARVIS, ton assistant personnel.")
+    setup = parser.add_argument_group("installation")
+    setup.add_argument("--configurer", action="store_true", help="assistant de configuration pas à pas")
+    setup.add_argument("--profil", action="store_true", help="ouvrir ton profil (« qui tu es ») pour le modifier")
+    setup.add_argument("--connecter-google", nargs="?", const="", metavar="FICHIER_JSON",
+                       help="relier Gmail et Google Agenda")
+    setup.add_argument("--cle", metavar="CLE_API", help="enregistrer ta clé API Anthropic")
+    setup.add_argument("--elevenlabs", metavar="CLE", help="enregistrer ta clé ElevenLabs")
+    setup.add_argument("--telegram", metavar="JETON", help="enregistrer le jeton de ton bot Telegram")
+    setup.add_argument("--telegram-autoriser", metavar="ID", help="autoriser ton compte Telegram")
+    setup.add_argument("--installer-demarrage", action="store_true", help="lancer Jarvis à chaque démarrage")
+    setup.add_argument("--retirer-demarrage", action="store_true", help="ne plus lancer Jarvis au démarrage")
+
+    run = parser.add_argument_group("utilisation")
+    run.add_argument("--interface", action="store_true", help="ouvrir l'interface dans le navigateur")
+    run.add_argument("--sans-micro", action="store_true",
+                     help="pas d'écoute au micro (interface, Telegram et WhatsApp seulement)")
+    run.add_argument("--texte", action="store_true", help="écrire au clavier au lieu de parler")
+    run.add_argument("--muet", action="store_true", help="ne pas lire les réponses à voix haute")
+    run.add_argument("--toujours", action="store_true", help="répondre sans attendre « Jarvis »")
+    run.add_argument("--voix", default=None, help="voix pour cette session (Daniel, Henri, Denise…)")
+    run.add_argument("--choisir-voix", action="store_true", help="écouter les voix et choisir")
+    run.add_argument("--liste-voix", action="store_true", help="afficher les voix disponibles")
+    run.add_argument("--modele", choices=list(MODELS),
+                     help="opus, sonnet (2x moins cher) ou haiku (4x moins cher) ; mémorisé")
+    run.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"],
+                     help="profondeur de réflexion (low = plus rapide) ; mémorisé")
+    run.add_argument("--fond", action="store_true", help=argparse.SUPPRESS)  # lancement automatique
     args = parser.parse_args()
 
     if args.fond:
@@ -255,39 +247,58 @@ def main() -> None:
         args.texte = False
         print(f"\n=== Démarrage de Jarvis {datetime.datetime.now():%Y-%m-%d %H:%M} ===")
 
-    if args.cle:
-        config.save("cle_api", args.cle.strip())
-        print(f"Clé API enregistrée dans {config.CONFIG_PATH}.")
-    if args.modele != (config.get("modele") or "opus"):
-        config.save("modele", args.modele)
+    # --- réglages ponctuels ------------------------------------------------
+    one_shot = False
+    for flag, key in (("cle", "cle_api"), ("elevenlabs", "elevenlabs_cle"), ("telegram", "telegram_token"),
+                      ("telegram_autoriser", "telegram_utilisateur"), ("modele", "modele"), ("effort", "effort")):
+        value = getattr(args, flag)
+        if value:
+            config.save(key, value.strip())
+            print(f"Réglage « {key} » enregistré.")
+            one_shot = one_shot or flag not in ("modele", "effort")
     config.apply_api_key()
 
+    if args.configurer:
+        from .setup_wizard import run as wizard
+
+        return wizard()
+    if args.profil:
+        print(f"Profil ouvert : {profile.open_in_editor()}")
+        return
+    if args.connecter_google is not None:
+        from .tools import google as google_tools
+
+        google_tools.connect(args.connecter_google or None)
+        print("Gmail et Google Agenda sont connectés.")
+        return
     if args.installer_demarrage:
-        path = autostart.install()
-        print(f"Jarvis se lancera tout seul à chaque démarrage ({path}).")
-        if not os.getenv("ANTHROPIC_API_KEY"):
-            print("Attention : aucune clé API enregistrée. Lance : python -m jarvis --cle sk-ant-...")
+        print(f"Jarvis se lancera tout seul à chaque démarrage ({autostart.install()}).")
         return
     if args.retirer_demarrage:
         path = autostart.uninstall()
         print(f"Lancement automatique retiré ({path})." if path else "Jarvis n'était pas au démarrage.")
         return
-    if args.cle:
-        return
-
     if args.liste_voix:
-        for name in voices.VOICES:
+        for name in voices.catalog():
             print(f"  {voices.describe(name)}")
         return
     if args.choisir_voix:
-        choose_voice_menu(args.muet)
+        return choose_voice_menu(args.muet)
+    if one_shot:
         return
 
     if not os.getenv("ANTHROPIC_API_KEY"):
-        print("Aucune clé API. Crée-en une sur https://console.anthropic.com/ puis lance :\n"
-              "  python -m jarvis --cle sk-ant-...")
+        print("Aucune clé API. Lance d'abord : python -m jarvis --configurer")
         return
 
+    profile.ensure()
+    services.start(open_interface=args.interface)
+    if args.sans_micro:
+        print("Jarvis tourne (interface, Telegram, WhatsApp). Ctrl+C pour arrêter.")
+        try:
+            threading.Event().wait()
+        except KeyboardInterrupt:
+            return
     Jarvis(args).run()
 
 
