@@ -20,7 +20,6 @@ class Voice:
         self._texts: queue.Queue[str] = queue.Queue()
         self._audio: queue.Queue[tuple[str, bytes | None, str]] = queue.Queue()
         self._engine = None
-        self._mixer_ready = False
         threading.Thread(target=self._synth_loop, daemon=True).start()
         threading.Thread(target=self._play_loop, daemon=True).start()
 
@@ -64,12 +63,9 @@ class Voice:
     def _play(self, audio: bytes, ext: str = "mp3") -> None:
         import pygame
 
-        if not self._mixer_ready:
-            from .audio_devices import output_device
+        from .audio_out import ensure_mixer
 
-            device = output_device()  # ex. « CABLE Input » pour passer par Voicemod
-            pygame.mixer.init(devicename=device) if device else pygame.mixer.init()
-            self._mixer_ready = True
+        ensure_mixer()  # sortie son partagée avec la musique de démarrage
         fd, path = tempfile.mkstemp(suffix=f".{ext}")
         try:
             with os.fdopen(fd, "wb") as f:

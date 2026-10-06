@@ -292,6 +292,17 @@ il réfléchit et pulse quand il parle, avec ses phrases en sous-titre.
   normale* ou *Toujours au premier plan*. Aussi : *Masquer*, *Quitter*.
 - **Ctrl+Alt+J** n'importe où : afficher / masquer. Ou à la voix : « Jarvis, cache-toi » / « Jarvis, montre-toi ».
 
+### Musique d'entrée (Thunderstruck)
+Au lancement, Jarvis joue **Thunderstruck** à plein volume, puis la musique baisse progressivement
+jusqu'à un fond sonore, et s'efface quand Jarvis parle. Le morceau n'est pas fourni (droits d'auteur) :
+mets ton MP3 de Thunderstruck dans ton dossier **Musique** (Jarvis le trouve tout seul), ou :
+```powershell
+python -m jarvis --musique-demarrage "C:\chemin\vers\Thunderstruck.mp3"   # ou un autre morceau
+python -m jarvis --volume-fond 10        # volume une fois en fond (défaut 15 %)
+python -m jarvis --musique-demarrage non # désactiver
+```
+Pour la couper : « Jarvis, coupe la musique », ou clic droit sur la boule → *Couper la musique*.
+
 ### Démarrage automatique
 ```bash
 python -m jarvis --installer-demarrage    # à chaque allumage, en arrière-plan, sans fenêtre
@@ -372,6 +383,7 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--voix NOM`, `--choisir-voix`, `--liste-voix` | voix |
 | `--liste-audio`, `--sortie-audio NOM`, `--micro NOM` | choisir haut-parleur et micro (Voicemod) |
 | `--orbe`, `--sans-orbe` | boule animée sur l'écran (mémorisé) |
+| `--musique-demarrage CHEMIN`, `--volume-fond POURCENT` | musique d'entrée (Thunderstruck…), « non » pour la retirer |
 | `--interface`, `--sans-micro`, `--texte`, `--muet`, `--toujours` | façons de l'utiliser |
 | `--installer` | tout installer : icône Bureau + menu Démarrer, boule, lancement au démarrage |
 | `--raccourcis` | recréer seulement l'icône |

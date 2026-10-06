@@ -13,7 +13,7 @@ import unicodedata
 
 import anthropic
 
-from . import announcer, autostart, config, orb, reminders, state, profile, repliques, services, sessions, voices
+from . import announcer, autostart, config, orb, reminders, startup_music, state, profile, repliques, services, sessions, voices
 from .agent import MODELS, french_date, french_time
 from .tools import ToolFailure, media
 from .voice import Voice
@@ -88,6 +88,8 @@ class Jarvis:
         if not self.voice.muted:
             announcer.start(self.voice.say)
         reminders.on_due(self.voice.say)
+        if not self.voice.muted and startup_music.play():
+            time.sleep(4)  # quelques secondes d'intro avant de saluer
         self.voice.say(f"Bonjour {self.title}. Tous les systèmes sont opérationnels.")
         self.voice.wait()
 
@@ -224,6 +226,8 @@ class Jarvis:
                 return True
             for pattern, action in MEDIA_COMMANDS:
                 if pattern.match(clean):
+                    if action == "pause" and startup_music.stop():
+                        return True  # c'était la musique d'entrée de Jarvis
                     media.controle_media(action)
                     return True
         except ToolFailure as exc:
@@ -353,6 +357,10 @@ def main() -> None:
     run.add_argument("--voix", default=None, help="voix pour cette session (Daniel, Henri, Denise…)")
     run.add_argument("--effet", choices=["aucun", "ia", "droide", "tactique", "robot"],
                      help="effet sur la voix, sans Voicemod (mémorisé)")
+    run.add_argument("--musique-demarrage", metavar="CHEMIN",
+                     help="musique jouée au lancement (fichier MP3) ; « non » pour la désactiver (mémorisé)")
+    run.add_argument("--volume-fond", metavar="POURCENT",
+                     help="volume de la musique de démarrage une fois en fond, ex. 15 (mémorisé)")
     run.add_argument("--vitesse-voix", metavar="POURCENT", help="vitesse de la voix, ex. 10 ou -15 (mémorisé)")
     run.add_argument("--hauteur-voix", metavar="HZ", help="hauteur de la voix, ex. -20 (plus grave) ou 15 (mémorisé)")
     run.add_argument("--essayer-effets", action="store_true", help="écouter chaque effet de voix")
@@ -376,12 +384,14 @@ def main() -> None:
     for flag, key in (("cle", "cle_api"), ("elevenlabs", "elevenlabs_cle"),
                       ("dossier_musique", "dossier_musique"),
                       ("sortie_audio", "sortie_audio"), ("micro", "micro"), ("modele", "modele"), ("effort", "effort"), ("effet", "effet"),
-                      ("vitesse_voix", "vitesse_voix"), ("hauteur_voix", "hauteur_voix")):
+                      ("vitesse_voix", "vitesse_voix"), ("hauteur_voix", "hauteur_voix"),
+                      ("musique_demarrage", "musique_demarrage"), ("volume_fond", "musique_volume_fond")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
             print(f"Réglage « {key} » enregistré.")
-            one_shot = one_shot or flag not in ("modele", "effort", "effet", "vitesse_voix", "hauteur_voix")
+            one_shot = one_shot or flag not in ("modele", "effort", "effet", "vitesse_voix", "hauteur_voix",
+                                                 "musique_demarrage", "volume_fond")
     for key in ("sortie_audio", "micro"):
         if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
             config.save(key, None)

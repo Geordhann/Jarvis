@@ -266,6 +266,10 @@ def run(on_quit=None) -> None:
                 action = QAction(label, place, checkable=True, checked=self.layer == layer)
                 action.triggered.connect(lambda *_, l=layer: self.set_layer(l))
                 place.addAction(action)
+            from . import startup_music
+
+            if startup_music.is_playing():
+                menu.addAction("Couper la musique", lambda *_: startup_music.stop())
             menu.addAction("Masquer (Ctrl+Alt+J pour revenir)", lambda *_: self.hide())
             menu.addAction("Ouvrir l'interface complète", lambda *_: self.open_interface())
             menu.addSeparator()
