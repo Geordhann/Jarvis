@@ -208,6 +208,16 @@ succès, Monsieur" ». Ou modifie `~/.jarvis/repliques.json` (même format que `
 `{titre}`, `{heure}` et `{date}` sont remplacés automatiquement, et s'il y a plusieurs réponses,
 Jarvis en choisit une au hasard).
 
+### Installer Jarvis comme un vrai logiciel (sans PowerShell ensuite)
+```powershell
+python -m jarvis --installer
+```
+Crée l'icône **Jarvis** (le réacteur) sur le **Bureau** et dans le **menu Démarrer**, active la boule et
+le **lancement automatique au démarrage du PC**. Ensuite, plus besoin de PowerShell : double-clic sur
+l'icône, ou rien du tout (il démarre avec Windows). Jarvis tourne en arrière-plan sans fenêtre noire ;
+s'il tourne déjà, l'icône fait simplement réapparaître la boule. Pour l'arrêter : clic droit sur la
+boule → *Quitter*, ou « Jarvis, au revoir ». Journal en cas de souci : `~/.jarvis.log`.
+
 ## 3. Utilisation
 
 ```bash
@@ -336,4 +346,6 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--liste-audio`, `--sortie-audio NOM`, `--micro NOM` | choisir haut-parleur et micro (Voicemod) |
 | `--orbe`, `--sans-orbe` | boule animée sur l'écran (mémorisé) |
 | `--interface`, `--sans-micro`, `--texte`, `--muet`, `--toujours` | façons de l'utiliser |
+| `--installer` | tout installer : icône Bureau + menu Démarrer, boule, lancement au démarrage |
+| `--raccourcis` | recréer seulement l'icône |
 | `--installer-demarrage`, `--retirer-demarrage` | lancement automatique |

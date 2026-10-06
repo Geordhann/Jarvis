@@ -6,7 +6,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from . import config, sessions, telegram_bot, tts, voices, whatsapp
+from . import config, sessions, state, telegram_bot, tts, voices, whatsapp
 from .tools import google as google_tools
 
 PORT = 8765
@@ -97,7 +97,12 @@ async def start():
         voices.save_voice(name)
         return web.json_response({"ok": True, "voix": name})
 
+    async def show_orb(request: web.Request) -> web.Response:
+        state.request_visibility("afficher")
+        return web.json_response({"ok": True})
+
     app = web.Application(middlewares=[local_only])
+    app.router.add_post("/api/orbe/afficher", show_orb)
     app.router.add_get("/", index)
     app.router.add_post("/api/message", message)
     app.router.add_post("/api/voix/lire", speech)

@@ -115,6 +115,14 @@ def run() -> None:
     print("Si un morceau n'y est pas, Jarvis le lance sur YouTube.")
 
     _title("9. Démarrage automatique")
+    if _yes("Créer l'icône Jarvis sur le Bureau et dans le menu Démarrer ?"):
+        try:
+            for path in autostart.create_shortcuts():
+                print(f"Icône créée : {path}")
+        except Exception as exc:
+            print(f"Impossible de créer l'icône : {exc}")
+    if _yes("Afficher la boule animée sur l'écran ?"):
+        config.save("orbe", "oui")
     if _yes("Lancer Jarvis automatiquement à chaque démarrage de l'ordinateur ?"):
         print(f"Installé : {autostart.install()}")
 

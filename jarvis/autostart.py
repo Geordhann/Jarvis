@@ -72,3 +72,67 @@ def uninstall() -> Path | None:
         target.unlink()
         return target
     return None
+
+
+# --- icône sur le Bureau et dans le menu Démarrer --------------------------
+
+_PS_SHORTCUT = r"""
+$shell = New-Object -ComObject WScript.Shell
+$places = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs'))
+foreach ($dir in $places) {
+    $link = $shell.CreateShortcut((Join-Path $dir 'Jarvis.lnk'))
+    $link.TargetPath = $env:JARVIS_EXE
+    $link.Arguments = $env:JARVIS_ARGS
+    $link.WorkingDirectory = $env:JARVIS_DIR
+    if ($env:JARVIS_ICON) { $link.IconLocation = $env:JARVIS_ICON }
+    $link.Description = 'Jarvis, assistant personnel'
+    $link.Save()
+    Write-Output (Join-Path $dir 'Jarvis.lnk')
+}
+"""
+
+
+def _icon_path() -> str | None:
+    """Crée l'icône du réacteur (jarvis.ico) avec PySide6 si disponible."""
+    from . import config
+
+    path = config.data_dir() / ("jarvis.ico" if sys.platform == "win32" else "jarvis.png")
+    try:
+        from .orb import save_icon
+
+        save_icon(path)
+        return str(path)
+    except Exception as exc:
+        print(f"[raccourci] icône non créée ({exc}), icône par défaut utilisée.")
+        return None
+
+
+def create_shortcuts() -> list[str]:
+    """Icône « Jarvis » à double-cliquer : Bureau + menu Démarrer (ou équivalents)."""
+    import subprocess
+
+    python = _python()
+    icon = _icon_path()
+    if sys.platform == "win32":
+        env = {**os.environ, "JARVIS_EXE": python, "JARVIS_ARGS": " ".join(ARGS),
+               "JARVIS_DIR": str(PROJECT_DIR), "JARVIS_ICON": icon or ""}
+        out = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", _PS_SHORTCUT],
+                             env=env, capture_output=True, text=True, check=True)
+        return [line for line in out.stdout.splitlines() if line.strip()]
+    if sys.platform == "darwin":
+        target = Path.home() / "Desktop" / "Jarvis.command"
+        target.write_text(f"#!/bin/sh\ncd {shlex.quote(str(PROJECT_DIR))}\n"
+                          f"exec {shlex.quote(python)} {' '.join(ARGS)}\n", encoding="utf-8")
+        target.chmod(0o755)
+        return [str(target)]
+    command = f"cd {shlex.quote(str(PROJECT_DIR))} && exec {shlex.quote(python)} {' '.join(ARGS)}"
+    entry = ("[Desktop Entry]\nType=Application\nName=Jarvis\nComment=Assistant personnel\n"
+             f"Exec=sh -c {shlex.quote(command)}\n" + (f"Icon={icon}\n" if icon else "") + "Terminal=false\n")
+    created = []
+    for folder in (Path.home() / "Desktop", Path.home() / ".local/share/applications"):
+        if folder.is_dir():
+            target = folder / "jarvis.desktop"
+            target.write_text(entry, encoding="utf-8")
+            target.chmod(0o755)
+            created.append(str(target))
+    return created

@@ -268,6 +268,39 @@ def run(on_quit=None) -> None:
         on_quit()
 
 
+def save_icon(path) -> None:
+    """Dessine le réacteur en icône (pour le raccourci du Bureau)."""
+    from PySide6.QtCore import QPointF, Qt
+    from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPen, QPixmap, QRadialGradient
+
+    app = QGuiApplication.instance() or QGuiApplication([])  # noqa: F841 (nécessaire pour dessiner)
+    size = 256
+    pix = QPixmap(size, size)
+    pix.fill(Qt.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.Antialiasing)
+    c = QPointF(size / 2, size / 2)
+    cyan = QColor(79, 214, 255)
+    p.setPen(Qt.NoPen)
+    p.setBrush(QColor(3, 10, 18))
+    p.drawEllipse(c, 124, 124)
+    p.setPen(QPen(cyan, 14))
+    for i in range(8):
+        p.drawArc(26, 26, 204, 204, int((i * 45 + 6) * 16), int(32 * 16))
+    p.setPen(QPen(cyan, 4))
+    p.drawEllipse(c, 74, 74)
+    glow = QRadialGradient(c, 64)
+    glow.setColorAt(0, QColor(240, 252, 255))
+    glow.setColorAt(0.4, cyan)
+    glow.setColorAt(1, QColor(79, 214, 255, 0))
+    p.setPen(Qt.NoPen)
+    p.setBrush(glow)
+    p.drawEllipse(c, 64, 64)
+    p.end()
+    if not pix.save(str(path)):
+        raise OSError(f"impossible d'écrire {path}")
+
+
 def _start_hotkey() -> None:
     """Raccourci clavier global pour afficher / masquer la boule."""
     try:

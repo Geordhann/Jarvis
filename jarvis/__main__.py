@@ -243,6 +243,22 @@ def _init_ears(retry: bool = False):
             time.sleep(30)
 
 
+def _already_running() -> bool:
+    """Un seul Jarvis à la fois : s'il tourne déjà, on lui demande juste d'afficher sa boule."""
+    import json
+    import urllib.request
+
+    from .webui import PORT
+
+    request = urllib.request.Request(f"http://127.0.0.1:{PORT}/api/orbe/afficher", data=json.dumps({}).encode(),
+                                     headers={"X-Jarvis": "1", "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=2) as response:
+            return response.status == 200
+    except OSError:
+        return False
+
+
 def choose_voice_menu(muted: bool) -> None:
     """Menu interactif : écouter chaque voix et choisir celle de Jarvis."""
     names = list(voices.catalog())
@@ -286,6 +302,9 @@ def main() -> None:
     setup.add_argument("--elevenlabs", metavar="CLE", help="enregistrer ta clé ElevenLabs")
     setup.add_argument("--telegram", metavar="JETON", help="enregistrer le jeton de ton bot Telegram")
     setup.add_argument("--telegram-autoriser", metavar="ID", help="autoriser ton compte Telegram")
+    setup.add_argument("--installer", action="store_true",
+                       help="tout installer : icône sur le Bureau et le menu Démarrer, boule, lancement au démarrage")
+    setup.add_argument("--raccourcis", action="store_true", help="créer l'icône Jarvis (Bureau + menu Démarrer)")
     setup.add_argument("--installer-demarrage", action="store_true", help="lancer Jarvis à chaque démarrage")
     setup.add_argument("--retirer-demarrage", action="store_true", help="ne plus lancer Jarvis au démarrage")
 
@@ -351,6 +370,18 @@ def main() -> None:
         return
     if args.connecter_telegram_perso:
         return telegram_perso.connect_interactive()
+    if args.installer or args.raccourcis:
+        if args.installer:
+            config.save("orbe", "oui")
+        try:
+            for path in autostart.create_shortcuts():
+                print(f"Icône créée : {path}")
+        except Exception as exc:
+            print(f"Impossible de créer l'icône : {exc}")
+        if args.installer:
+            print(f"Lancement automatique au démarrage : {autostart.install()}")
+            print("\nC'est installé ! Double-clique sur l'icône Jarvis du Bureau pour le lancer.")
+        return
     if args.installer_demarrage:
         print(f"Jarvis se lancera tout seul à chaque démarrage ({autostart.install()}).")
         return
@@ -381,6 +412,10 @@ def main() -> None:
     if use_orb and not orb.available():
         print("La boule a besoin de PySide6 : pip install -r requirements.txt")
         use_orb = False
+
+    if _already_running():
+        print("Jarvis tourne déjà : je fais réapparaître sa boule.")
+        return
 
     profile.ensure()
     services.start(open_interface=args.interface)
