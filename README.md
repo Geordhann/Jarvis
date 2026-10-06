@@ -244,6 +244,12 @@ profil, mémoire), te lit le message et attend ton « oui ». Le téléphone doi
 Internet. Désactive l'optimisation de batterie pour l'appli pour qu'elle reste active.
 Jarvis ne lit pas tes SMS reçus.
 
+### Instagram, Snapchat et autres réseaux
+Ces réseaux n'offrent aucun accès officiel aux comptes personnels (les outils non officiels peuvent
+faire bannir ton compte). Jarvis passe donc par ton écran : « ouvre mes messages Instagram »,
+« regarde mon écran et résume mes messages », « réponds-lui que j'arrive » (il tape la réponse,
+c'est toi qui l'envoies).
+
 ## 3. Utilisation
 
 ```bash
@@ -318,7 +324,7 @@ description: Préparer un devis client à partir d'une demande reçue par mail.
 ```
 
 Jarvis voit la liste des skills et lit la fiche quand une demande correspond. Fiches fournies :
-`briefing-matin`, `tri-mails`, `redaction-mail`, `envoyer-sms`, `planifier-rdv`, `souvenir`.
+`briefing-matin`, `tri-mails`, `redaction-mail`, `envoyer-sms`, `reseaux-sociaux`, `planifier-rdv`, `souvenir`.
 
 ## 5. Combien ça coûte ?
 
