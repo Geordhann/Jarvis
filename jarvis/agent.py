@@ -64,7 +64,9 @@ Pour ces tâches, lis d'abord la fiche avec l'outil lire_skill, puis suis-la :
 # Tes outils
 {tools_note}
 Tu peux chercher sur le web et lire des pages (web_search, web_fetch), ouvrir des pages et des
-applications, lancer de la musique et la contrôler (pause, suivant, volume).
+applications et dossiers, lancer de la musique et la contrôler (pause, suivant, volume), tenir un carnet
+de notes, programmer des rappels et minuteurs, donner la météo, lire ou remplir le presse-papiers,
+connaître l'état du PC, le verrouiller ou l'éteindre, et regarder l'écran quand on te le demande.
 {messages_note}
 
 # Règles de sécurité
@@ -255,7 +257,8 @@ class Agent:
                 output = self.tools[call.name].run(call.input)
             else:
                 raise ToolFailure(f"outil inconnu : {call.name}")
-            return {"type": "tool_result", "tool_use_id": call.id, "content": str(output)}
+            content = output if isinstance(output, list) else str(output)  # liste = image + texte
+            return {"type": "tool_result", "tool_use_id": call.id, "content": content}
         except (ToolFailure, ToolError) as exc:
             return {"type": "tool_result", "tool_use_id": call.id, "content": f"Erreur : {exc}", "is_error": True}
         except Exception as exc:  # une panne d'outil ne doit pas arrêter Jarvis

@@ -237,6 +237,23 @@ l'icône, ou rien du tout (il démarre avec Windows). Jarvis tourne en arrière-
 s'il tourne déjà, l'icône fait simplement réapparaître la boule. Pour l'arrêter : clic droit sur la
 boule → *Quitter*, ou « Jarvis, au revoir ». Journal en cas de souci : `~/.jarvis.log`.
 
+### Les outils du quotidien (rien à configurer)
+| Tu dis | Jarvis |
+|---|---|
+| « Jarvis, note dans mes courses : pain et lait » | carnet de notes dans le dossier `Jarvis Notes` (fichiers lisibles par toi) |
+| « Jarvis, lis ma note courses » / « quelles notes j'ai ? » | lit ou liste tes notes |
+| « Jarvis, minuteur 10 minutes pour les pâtes » | il te prévient à voix haute (et sur Telegram si configuré) |
+| « Jarvis, rappelle-moi demain à 9 h d'appeler le garage » | rappel gardé même si le PC redémarre |
+| « Jarvis, quel temps fera-t-il à Lyon demain ? » | météo précise sur 7 jours (Open-Meteo, gratuit) |
+| « Jarvis, résume ce que j'ai copié » / « traduis ça » | lit ton presse-papiers |
+| « Jarvis, ouvre mes téléchargements » | ouvre le dossier |
+| « Jarvis, comment va le PC ? » | processeur, mémoire, disque, batterie |
+| « Jarvis, verrouille le PC » / « éteins le PC » | éteindre demande ta confirmation, et reste annulable une minute |
+| « Jarvis, regarde mon écran, c'est quoi cette erreur ? » | capture l'écran et l'analyse (seulement quand tu le demandes) |
+
+**Google Keep** n'a pas d'accès officiel pour les comptes Gmail personnels : le carnet de notes de Jarvis
+le remplace. Pour une note dans Google Docs, demande « crée un document Google avec… ».
+
 ## 3. Utilisation
 
 ```bash

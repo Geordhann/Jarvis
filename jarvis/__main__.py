@@ -13,7 +13,7 @@ import unicodedata
 
 import anthropic
 
-from . import announcer, autostart, config, orb, state, profile, repliques, services, sessions, telegram_perso, voices
+from . import announcer, autostart, config, orb, reminders, state, profile, repliques, services, sessions, telegram_perso, voices
 from .agent import MODELS, french_date, french_time
 from .tools import ToolFailure, media
 from .voice import Voice
@@ -85,6 +85,7 @@ class Jarvis:
     def run(self) -> None:
         if not self.voice.muted:
             announcer.start(self.voice.say)
+        reminders.on_due(self.voice.say)
         self.voice.say(f"Bonjour {self.title}. Tous les systèmes sont opérationnels.")
         self.voice.wait()
 
@@ -446,6 +447,7 @@ def main() -> None:
         return
 
     profile.ensure()
+    reminders.start()
     services.start(open_interface=args.interface)
 
     def assistant() -> None:

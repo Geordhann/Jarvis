@@ -21,3 +21,8 @@ telethon
 PySide6
 # Effets sur la voix (droïde, robot…)
 pedalboard
+# Notes, rappels, météo, presse-papiers, PC, écran
+psutil
+mss
+Pillow
+pyperclip
