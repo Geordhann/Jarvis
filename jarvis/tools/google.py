@@ -46,6 +46,8 @@ def connect(client_file: str | None = None) -> None:
     from google_auth_oauthlib.flow import InstalledAppFlow
 
     if client_file:
+        # Un glisser-déposer ou un collage ajoute souvent espaces, retours à la ligne ou guillemets.
+        client_file = client_file.strip().strip("\"'").strip()
         shutil.copy(client_file, client_secret_path())
     if not client_secret_path().exists():
         raise FileNotFoundError(
