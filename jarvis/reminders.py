@@ -1,4 +1,4 @@
-"""Rappels et minuteurs : Jarvis te prévient à voix haute (et sur Telegram si le bot est configuré).
+"""Rappels et minuteurs : Jarvis te prévient à voix haute.
 
 Les rappels sont gardés dans ~/.jarvis/rappels.json : ils survivent à un redémarrage du PC.
 """
@@ -11,8 +11,6 @@ import threading
 import time
 import uuid
 from typing import Callable
-
-import requests
 
 from . import config
 
@@ -90,17 +88,5 @@ def _loop() -> None:
                     listener(message)
                 except Exception as exc:
                     print(f"[rappels] erreur : {exc}")
-            _notify_phone(message)
         time.sleep(5)
 
-
-def _notify_phone(message: str) -> None:
-    """Envoie aussi le rappel sur Telegram (utile quand on n'est pas devant le PC)."""
-    token, owner = config.get("telegram_token"), config.get("telegram_utilisateur")
-    if not (token and owner):
-        return
-    try:
-        requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
-                      json={"chat_id": owner, "text": f"⏰ {message}"}, timeout=15)
-    except requests.RequestException as exc:
-        print(f"[rappels] Telegram injoignable : {exc}")

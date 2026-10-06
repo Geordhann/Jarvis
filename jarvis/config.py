@@ -33,7 +33,7 @@ def get(key: str, default: str | None = None) -> str | None:
 
 def save(key: str, value: str | None) -> None:
     data = load()
-    if value is not None and key in ("cle_api", "elevenlabs_cle", "telegram_token", "whatsapp_token"):
+    if value is not None and key in ("cle_api", "elevenlabs_cle", "sms_utilisateur", "sms_mot_de_passe"):
         value = clean_key(value)
     if value is None:
         data.pop(key, None)

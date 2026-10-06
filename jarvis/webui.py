@@ -6,7 +6,8 @@ import asyncio
 import json
 from pathlib import Path
 
-from . import config, effects, sessions, state, telegram_bot, tts, voices, whatsapp
+from . import config, effects, sessions, state, tts, voices
+from .tools import sms
 from .tools import google as google_tools
 
 PORT = 8765
@@ -85,8 +86,7 @@ async def start():
             "connexions": {
                 "Gmail & Agenda": google_tools.is_connected(),
                 "ElevenLabs": voices.has_elevenlabs(),
-                "Telegram": telegram_bot.is_configured(),
-                "WhatsApp": whatsapp.is_configured(),
+                "SMS": sms.is_configured(),
             },
         })
 

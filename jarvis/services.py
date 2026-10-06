@@ -1,4 +1,4 @@
-"""Lance en arrière-plan l'interface, le bot Telegram et le webhook WhatsApp."""
+"""Lance l'interface de Jarvis en arrière-plan."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import asyncio
 import threading
 import webbrowser
 
-from . import telegram_bot, webui, whatsapp
+from . import webui
 
 
 def start(open_interface: bool = False) -> threading.Thread:
@@ -19,16 +19,6 @@ def start(open_interface: bool = False) -> threading.Thread:
                 webbrowser.open(f"http://localhost:{webui.PORT}")
         except OSError as exc:
             print(f"[interface] impossible de démarrer (port {webui.PORT} déjà pris ?) : {exc}")
-        if telegram_bot.is_configured():
-            try:
-                await telegram_bot.start()
-            except Exception as exc:
-                print(f"[telegram] impossible de démarrer : {exc}")
-        if whatsapp.is_configured():
-            try:
-                await whatsapp.start()
-            except Exception as exc:
-                print(f"[whatsapp] impossible de démarrer : {exc}")
         ready.set()
         await asyncio.Event().wait()  # tourne jusqu'à la fin du programme
 

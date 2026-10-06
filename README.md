@@ -1,12 +1,12 @@
 # J.A.R.V.I.S. — ton assistant personnel
 
-Un agent à la Iron Man, propulsé par **Claude**. Tu lui parles (à voix haute, sur Telegram,
-sur WhatsApp ou dans son interface) et il **agit** : il lit et rédige tes mails, gère ton agenda,
+Un agent à la Iron Man, propulsé par **Claude**. Tu lui parles (à voix haute ou dans son interface)
+et il **agit** : il lit et rédige tes mails, gère ton agenda, envoie des SMS, contrôle tes applications,
 cherche sur le web, ouvre des pages, se souvient de toi, et te répond avec une voix réaliste.
 
 ```
             ┌──────────── toi ─────────────┐
-   micro « Jarvis… »   Telegram   WhatsApp   interface web
+         micro « Jarvis… »    interface / boule
             └──────────────┬───────────────┘
                      moteur d'agent  ◄── profil (qui tu es) + skills + mémoire
                     (Claude + outils)
@@ -22,11 +22,10 @@ cherche sur le web, ouvre des pages, se souvient de toi, et te répond avec une 
 | Outils | Gmail, Google Agenda, recherche et lecture web, navigateur | `jarvis/tools/` |
 | Mémoire persistante | Jarvis note ce qu'il apprend sur toi dans des fichiers | `~/.jarvis/memories/` |
 | Skills | fiches d'instructions pour des tâches précises | `jarvis/skills/`, `~/.jarvis/skills/` |
-| Messagerie | Telegram et WhatsApp, texte et vocaux | `jarvis/telegram_bot.py`, `jarvis/whatsapp.py` |
 | Voix | ElevenLabs (réaliste) ou voix gratuite | `jarvis/tts.py` |
 | Interface | tableau de bord avec réacteur animé par la voix, micro, mains libres | `jarvis/interface/` |
 | Musique | lance un morceau (fichiers locaux ou YouTube), pause, suivant, volume | `jarvis/tools/media.py` |
-| Messages | lit et envoie tes messages Telegram perso, annonce les nouveaux mails et messages | `jarvis/telegram_perso.py`, `jarvis/announcer.py` |
+| SMS | envoie des SMS depuis ton téléphone Android, après ta confirmation | `jarvis/tools/sms.py` |
 | Répliques | phrases prêtes à dire pour des questions précises, instantanées et gratuites | `jarvis/repliques.json` |
 
 ---
@@ -55,7 +54,7 @@ python -m jarvis --configurer
 ```
 
 L'assistant te demande, étape par étape : la clé Claude, ton profil, la voix ElevenLabs,
-Gmail/Agenda, Telegram, WhatsApp et le démarrage automatique. Tu peux sauter une étape
+Google, les SMS, la musique et le démarrage automatique. Tu peux sauter une étape
 et y revenir plus tard. Les détails de chaque étape sont ci-dessous.
 
 ### Clé Claude (obligatoire)
@@ -77,8 +76,7 @@ Ce qu'il apprend ensuite tout seul va dans sa mémoire (`~/.jarvis/memories/`), 
 ### Voix ElevenLabs
 <https://elevenlabs.io> → *Profile* → *API Keys*. L'offre gratuite donne environ 10 minutes de voix par mois ;
 au-delà, il faut un abonnement (à partir d'environ 5 $/mois). Sans clé, ou si le quota est épuisé,
-Jarvis passe automatiquement sur la voix gratuite. La clé ElevenLabs sert aussi à **comprendre tes
-messages vocaux** Telegram et WhatsApp.
+Jarvis passe automatiquement sur la voix gratuite.
 
 ```bash
 python -m jarvis --elevenlabs TA_CLE
@@ -100,7 +98,6 @@ Ou à la voix : « Jarvis, mets l'effet droïde », « Jarvis, mode tactique »,
 | `tactique` | droïde tactique : plus grave, froid et métallique |
 | `robot` | très métallique, façon vieux synthétiseur |
 
-L'effet s'applique à la voix de l'ordinateur et de l'interface (pas aux vocaux Telegram/WhatsApp).
 
 ### Voix de Jarvis dans Voicemod (facultatif)
 Seulement si tu veux un effet précis de Voicemod : l'effet intégré ci-dessus suffit dans la plupart des cas.
@@ -158,40 +155,6 @@ Si Jarvis te dit qu'il manque des autorisations (après une mise à jour), relan
 **Il annonce toujours un envoi ou un rendez-vous et attend ton « oui » avant de le faire.**
 Il ne peut pas supprimer définitivement de mail.
 
-### Telegram
-1. Dans Telegram, écris à **@BotFather** → `/newbot` → choisis un nom → copie le **jeton**.
-2. `python -m jarvis --telegram LE_JETON`
-3. Lance Jarvis, puis envoie `/start` à ton bot : il te répond avec ton identifiant.
-4. `python -m jarvis --telegram-autoriser TON_IDENTIFIANT`, puis relance Jarvis.
-
-Seul ton compte peut lui parler. Envoie du texte ou des vocaux (il répond alors aussi en vocal).
-`/nouveau` efface la conversation en cours.
-
-### WhatsApp
-Plus long que Telegram (≈ 25 min, une seule fois), car Meta impose un compte développeur.
-1. **ngrok** (adresse publique gratuite pour que Meta joigne ton PC) : crée un compte sur
-   <https://ngrok.com>, puis dans PowerShell `winget install ngrok.ngrok` et
-   `ngrok config add-authtoken TON_AUTHTOKEN` (visible dans le tableau de bord ngrok).
-   Dans le tableau de bord → *Domains*, récupère ton **domaine gratuit** (ex. `truc-machin.ngrok-free.app`).
-2. <https://developers.facebook.com/> → *Mes apps* → **Créer une app** → cas d'usage
-   « Se connecter avec les clients via WhatsApp » → crée ou choisis un portefeuille business.
-3. *WhatsApp → Configuration de l'API* : Meta fournit un **numéro de test gratuit**. Note le
-   **Phone number ID**, ajoute **ton** numéro dans la liste « À », et génère un **jeton d'accès**.
-4. *Paramètres de l'app → Général* : note la **clé secrète** (App secret).
-5. `python -m jarvis --configurer-whatsapp` : colle ces informations et ton domaine ngrok.
-   Il affiche l'**URL de rappel** et le **jeton de vérification**.
-6. Relance Jarvis (il démarre ngrok tout seul), puis dans Meta *WhatsApp → Configuration → Webhook* :
-   colle l'URL et le jeton → *Vérifier et enregistrer* → *Gérer* → abonne-toi à **messages**.
-7. Sur ton téléphone, envoie « Bonjour » au numéro de test : Jarvis répond.
-
-Le jeton d'accès de l'étape 3 expire au bout de **24 h**. Pour un jeton permanent : *Paramètres business →
-Utilisateurs système* → crée un utilisateur système admin → *Ajouter des éléments* → ton app (contrôle total)
-→ *Générer un jeton* (expiration : jamais, autorisations `whatsapp_business_messaging` et
-`whatsapp_business_management`), puis relance `--configurer-whatsapp`.
-
-Seuls les messages signés par Meta et venant de **ton** numéro sont traités ; l'interface (port 8765)
-n'est jamais exposée par le tunnel. Les réponses à tes messages (dans les 24 h) sont gratuites.
-
 ### Musique
 Rien à configurer : « Jarvis, mets de la musique de Daft Punk » cherche d'abord dans ton dossier
 Musique (`--dossier-musique CHEMIN` pour en choisir un autre), sinon lance directement la vidéo
@@ -199,21 +162,9 @@ YouTube. Ensuite : « pause », « reprends », « chanson suivante », « monte
 (ces commandes fonctionnent avec n'importe quel lecteur : YouTube, Spotify, VLC…).
 « Ouvre Spotify » lance l'application.
 
-### Tes messages Telegram personnels
-Le bot Telegram ne voit que les messages qu'on **lui** envoie. Pour que Jarvis lise **tes** messages :
-1. <https://my.telegram.org> → *API development tools* → crée une application, note `api_id` et `api_hash`.
-2. `python -m jarvis --connecter-telegram-perso` → numéro de téléphone puis code reçu dans Telegram.
-
-« Jarvis, j'ai des messages ? » lit tes messages non lus ; « réponds à Julie que j'arrive » prépare
-la réponse et attend ton « oui ». Utilise ce lien pour ton propre compte uniquement.
-
-**WhatsApp perso et SMS** : Jarvis ne peut pas les lire. WhatsApp n'offre aucun accès officiel aux
-conversations personnelles (les outils non officiels peuvent faire bannir ton numéro), et les SMS
-restent sur le téléphone.
-
 ### Annonces automatiques
 Quand Jarvis tourne avec le micro, il annonce à voix haute les **nouveaux mails** (boîte principale,
-vérifiée toutes les 2 minutes) et les **nouveaux messages Telegram privés** : « Monsieur, nouveau mail
+vérifiée toutes les 2 minutes) : « Monsieur, nouveau mail
 de Marc : devis cuisine. » C'est gratuit (pas d'appel à Claude).
 « Jarvis, arrête les annonces » / « active les annonces ».
 
@@ -248,7 +199,6 @@ boule → *Quitter*, ou « Jarvis, au revoir ». Journal en cas de souci : `~/.j
 |---|---|
 | « Jarvis, note dans mes courses : pain et lait » | carnet de notes dans le dossier `Jarvis Notes` (fichiers lisibles par toi) |
 | « Jarvis, lis ma note courses » / « quelles notes j'ai ? » | lit ou liste tes notes |
-| « Jarvis, minuteur 10 minutes pour les pâtes » | il te prévient à voix haute (et sur Telegram si configuré) |
 | « Jarvis, rappelle-moi demain à 9 h d'appeler le garage » | rappel gardé même si le PC redémarre |
 | « Jarvis, quel temps fera-t-il à Lyon demain ? » | météo précise sur 7 jours (Open-Meteo, gratuit) |
 | « Jarvis, résume ce que j'ai copié » / « traduis ça » | lit ton presse-papiers |
@@ -281,10 +231,22 @@ python -m jarvis --essayer-effets      # + un effet : ia, droide, tactique, robo
 ```
 À la voix : « Jarvis, parle plus lentement », « Jarvis, voix plus grave », « Jarvis, prends la voix de Bryan ».
 
+### SMS (téléphone Android)
+Jarvis envoie les SMS **depuis ton propre numéro**, gratuitement (compris dans ton forfait), grâce à
+l'appli open source [SMS Gateway for Android](https://sms-gate.app).
+1. Sur ton téléphone : installe **SMS Gateway for Android** (Google Play), ouvre-la, autorise l'envoi de SMS,
+   active **Cloud server** puis appuie sur **Démarrer** (Online).
+2. L'écran d'accueil de l'appli affiche un **Username** et un **Password**.
+3. Sur le PC : `python -m jarvis --configurer-sms` → colle-les, puis accepte le SMS de test.
+
+« Jarvis, envoie un SMS à Julie pour lui dire que j'arrive » : il trouve le numéro (contacts Google,
+profil, mémoire), te lit le message et attend ton « oui ». Le téléphone doit être allumé et connecté à
+Internet. Désactive l'optimisation de batterie pour l'appli pour qu'elle reste active.
+Jarvis ne lit pas tes SMS reçus.
+
 ## 3. Utilisation
 
 ```bash
-python -m jarvis               # micro + interface + Telegram + WhatsApp
 python -m jarvis --interface   # pareil, et ouvre l'interface dans le navigateur
 python -m jarvis --sans-micro  # sans écoute au micro (interface et messageries seulement)
 python -m jarvis --texte       # au clavier dans le terminal
@@ -336,10 +298,8 @@ Ce qu'il fait est noté dans `~/.jarvis.log`.
 Projets et tutos étudiés pour construire cette version :
 - [sacha9214/jarvis-vocal](https://github.com/sacha9214/jarvis-vocal) : Jarvis français local (Whisper, Piper), contrôle musique et réponses rapides sans IA
 - [bertrandmbanwi/Jarvis](https://github.com/bertrandmbanwi/Jarvis) : 100+ outils, interface en particules, mémoire
-- [AnubhavChaturvedi-GitHub/jarvis-ai-assistant](https://github.com/AnubhavChaturvedi-GitHub/jarvis-ai-assistant) : automatisation WhatsApp, recherche web
 - [projectswithdigambar/jarvis](https://github.com/projectswithdigambar/jarvis) : interface web, YouTube et Spotify
 - [codewithdars/jarvis-voice-assistant](https://github.com/codewithdars/jarvis-voice-assistant) : musique via yt-dlp
-- [EZHOWWW/tg-skill](https://github.com/EZHOWWW/tg-skill) : Telegram perso (Telethon) pour agents IA
 - Tutos : [Le Geek Heureux — Crée ton propre Jarvis en Python](https://legeekheureux.fr/%F0%9F%A4%96-cree-ton-propre-jarvis-en-python-un-assistant-vocal-pour-ton-pc/),
   [« J'ai codé mon propre Jarvis » (YouTube)](https://www.youtube.com/watch?v=s7qmuKYh2fs)
 
@@ -358,16 +318,14 @@ description: Préparer un devis client à partir d'une demande reçue par mail.
 ```
 
 Jarvis voit la liste des skills et lit la fiche quand une demande correspond. Fiches fournies :
-`briefing-matin`, `tri-mails`, `redaction-mail`, `planifier-rdv`, `souvenir`.
+`briefing-matin`, `tri-mails`, `redaction-mail`, `envoyer-sms`, `planifier-rdv`, `souvenir`.
 
 ## 5. Combien ça coûte ?
 
 | Partie | Prix |
 |---|---|
-| Écoute au micro, voix gratuite, Telegram, musique, annonces, répliques prêtes | gratuit |
 | Cerveau (Claude, API Anthropic) | **payant à l'usage** — pas inclus dans un abonnement Claude.ai |
 | Voix ElevenLabs | gratuit jusqu'à ~10 min/mois, puis abonnement |
-| WhatsApp | selon les règles de facturation de Meta |
 
 Estimation **par demande** (dépend de la longueur et du nombre d'outils utilisés) :
 
@@ -401,10 +359,8 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--configurer` | configuration guidée |
 | `--profil` | modifier « qui tu es » |
 | `--connecter-google FICHIER` | relier Gmail et Agenda |
-| `--configurer-whatsapp` | relier WhatsApp (numéro Meta + tunnel ngrok lancé automatiquement) |
-| `--connecter-telegram-perso` | relier ton compte Telegram (lire et envoyer tes messages) |
+| `--configurer-sms` | relier ton téléphone Android pour envoyer des SMS |
 | `--dossier-musique DOSSIER` | dossier de ta musique locale |
-| `--elevenlabs CLE`, `--telegram JETON`, `--telegram-autoriser ID`, `--cle CLE` | enregistrer une clé |
 | `--tester-cle` | vérifier que la clé Claude fonctionne |
 | `--modele opus/sonnet/haiku`, `--effort low…max` | cerveau (mémorisé) |
 | `--voix NOM`, `--choisir-voix`, `--liste-voix` | voix |

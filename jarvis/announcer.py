@@ -1,4 +1,4 @@
-"""Annonces automatiques : Jarvis te prévient à voix haute des nouveaux mails et messages.
+"""Annonces automatiques : Jarvis te prévient à voix haute des nouveaux mails.
 
 Aucun appel à Claude : c'est gratuit. Désactivable avec « annonces »: "non" dans ~/.jarvis.json
 ou en disant « Jarvis, arrête les annonces ».
@@ -10,7 +10,7 @@ import threading
 import time
 from typing import Callable
 
-from . import config, telegram_perso
+from . import config
 from .tools import google as google_tools
 
 GMAIL_EVERY_SECONDS = 120
@@ -24,12 +24,6 @@ def enabled() -> bool:
 def start(say: Callable[[str], None]) -> None:
     if google_tools.is_connected():
         threading.Thread(target=_watch_gmail, args=(say,), daemon=True, name="annonces-gmail").start()
-    if telegram_perso.is_configured():
-        try:
-            telegram_perso.on_new_message(
-                lambda name, text: enabled() and say(f"Nouveau message Telegram de {name}."))
-        except Exception as exc:
-            print(f"[annonces] Telegram perso indisponible : {exc}")
 
 
 def _unread_gmail() -> list[tuple[str, str, str]]:

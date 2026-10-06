@@ -267,8 +267,8 @@ def tools() -> list[Tool]:
         Tool("note_supprimer", "Supprime une note, après confirmation explicite.",
              {"titre": string("titre de la note"), "confirme_par_utilisateur": confirm},
              note_supprimer, ["titre", "confirme_par_utilisateur"]),
-        Tool("rappel_ajouter", "Programme un rappel ou un minuteur : Jarvis le dira à voix haute (et sur "
-             "Telegram) au bon moment. « dans 10 minutes » → dans_minutes ; « demain à 9 h » → quand.",
+        Tool("rappel_ajouter", "Programme un rappel ou un minuteur : Jarvis le dira à voix haute au "
+             "bon moment. « dans 10 minutes » → dans_minutes ; « demain à 9 h » → quand.",
              {"texte": string("ce qu'il faut rappeler"), "dans_minutes": integer("délai en minutes"),
               "quand": string("date et heure locales AAAA-MM-JJTHH:MM")},
              rappel_ajouter, ["texte"]),

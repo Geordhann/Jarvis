@@ -10,13 +10,11 @@ requests
 # Gmail et Google Agenda
 google-api-python-client
 google-auth-oauthlib
-# Telegram, WhatsApp et interface
-python-telegram-bot>=21
+# Interface
 aiohttp
-# Musique, contrôle multimédia et messages Telegram perso
+# Musique et contrôle multimédia
 yt-dlp
 pynput
-telethon
 # Boule animée à l'écran
 PySide6
 # Effets sur la voix (droïde, robot…)

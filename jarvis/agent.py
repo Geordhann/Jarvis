@@ -17,7 +17,8 @@ from anthropic.lib.tools import ToolError
 # Mémoire persistante fournie par le SDK : des fichiers dans ~/.jarvis/memories/.
 from anthropic.lib.tools._beta_builtin_memory_tool import BetaLocalFilesystemMemoryTool
 
-from . import config, profile, repliques, skills, telegram_perso
+from . import config, profile, repliques, skills
+from .tools import sms as sms_tools
 from .tools import Tool, ToolFailure, all_tools
 from .tools import google as google_tools
 
@@ -33,9 +34,6 @@ CHANNELS = {
     "voix": "Tes réponses sont LUES À VOIX HAUTE : phrases courtes et naturelles, sans Markdown, "
             "sans listes, sans émojis, nombres et unités écrits pour bien se prononcer. "
             "Quand tu lances une action qui prend du temps, annonce-la en quelques mots d'abord.",
-    "telegram": "Tu réponds par message Telegram : réponses courtes, mise en forme légère autorisée "
-                "(listes simples), pas de tableaux.",
-    "whatsapp": "Tu réponds par message WhatsApp : réponses courtes, texte simple, pas de tableaux.",
     "web": "Tu réponds dans l'interface de Jarvis : tes réponses s'affichent ET sont lues à voix haute. "
            "Reste bref et naturel, sans Markdown ni listes.",
 }
@@ -119,7 +117,7 @@ class SentenceSplitter:
 
 
 class Agent:
-    """Une conversation avec Jarvis (une par canal : voix, Telegram, WhatsApp, interface)."""
+    """Une conversation avec Jarvis (une par canal : voix, interface)."""
 
     def __init__(self, channel: str = "voix", model: str | None = None, effort: str | None = None):
         self.client = anthropic.Anthropic()
@@ -142,10 +140,11 @@ class Agent:
                  "faut lancer « python -m jarvis --connecter-google »."
         )
         messages_note = (
-            "Tu as accès aux messages Telegram personnels de l'utilisateur." if telegram_perso.is_configured()
-            else "Les messages Telegram personnels ne sont pas connectés (python -m jarvis --connecter-telegram-perso)."
-        ) + (" Tu n'as pas accès à ses SMS ni à ses conversations WhatsApp personnelles : "
-             "WhatsApp et les opérateurs ne le permettent pas.")
+            "Tu peux envoyer des SMS depuis le téléphone de l'utilisateur (envoyer_sms), toujours après son accord."
+            if sms_tools.is_configured()
+            else "Les SMS ne sont pas configurés : si on te le demande, explique qu'il faut lancer "
+                 "« python -m jarvis --configurer-sms »."
+        ) + " Tu ne peux pas lire ses SMS reçus ni ses conversations WhatsApp ou Telegram."
         self.system = SYSTEM_PROMPT.format(
             messages_note=messages_note,
             profile=profile.read() or "(profil vide)",

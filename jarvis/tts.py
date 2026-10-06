@@ -1,7 +1,6 @@
-"""Synthèse vocale (texte -> MP3) et transcription (audio -> texte).
+"""Synthèse vocale (texte -> MP3).
 
-ElevenLabs si une clé est configurée, sinon edge-tts (gratuit). La transcription des
-messages vocaux Telegram/WhatsApp utilise ElevenLabs Scribe.
+ElevenLabs si une clé est configurée, sinon edge-tts (gratuit).
 """
 
 from __future__ import annotations
@@ -69,27 +68,9 @@ def _edge_tts(text: str, voice_id: str) -> bytes:
         asyncio.get_running_loop()
     except RuntimeError:
         return asyncio.run(run())
-    # Appelé depuis une boucle asyncio (Telegram, interface) : on passe par un thread.
+    # Appelé depuis une boucle asyncio (interface) : on passe par un thread.
     import concurrent.futures
 
     with concurrent.futures.ThreadPoolExecutor(1) as pool:
         return pool.submit(asyncio.run, run()).result()
 
-
-def can_transcribe() -> bool:
-    return voices.has_elevenlabs()
-
-
-def transcribe(audio: bytes, filename: str = "audio.ogg") -> str:
-    """Transcrit un message vocal en texte (ElevenLabs Scribe)."""
-    if not can_transcribe():
-        raise RuntimeError("la transcription des vocaux nécessite une clé ElevenLabs")
-    response = requests.post(
-        f"{ELEVEN_API}/speech-to-text",
-        headers={"xi-api-key": config.get("elevenlabs_cle") or ""},
-        data={"model_id": config.get("elevenlabs_stt_modele", "scribe_v1"), "language_code": "fra"},
-        files={"file": (filename, audio)},
-        timeout=120,
-    )
-    response.raise_for_status()
-    return response.json().get("text", "").strip()

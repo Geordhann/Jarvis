@@ -13,7 +13,7 @@ import unicodedata
 
 import anthropic
 
-from . import announcer, autostart, config, orb, reminders, state, profile, repliques, services, sessions, telegram_perso, voices
+from . import announcer, autostart, config, orb, reminders, state, profile, repliques, services, sessions, voices
 from .agent import MODELS, french_date, french_time
 from .tools import ToolFailure, media
 from .voice import Voice
@@ -327,20 +327,16 @@ def main() -> None:
                        help="relier Gmail et Google Agenda")
     setup.add_argument("--cle", metavar="CLE_API", help="enregistrer ta clé API Anthropic")
     setup.add_argument("--tester-cle", action="store_true", help="vérifier que la clé Claude fonctionne")
-    setup.add_argument("--connecter-telegram-perso", action="store_true",
-                       help="relier ton compte Telegram personnel (lire et envoyer tes messages)")
     setup.add_argument("--liste-audio", action="store_true", help="afficher les sorties audio et les micros")
     setup.add_argument("--sortie-audio", metavar="NOM",
                        help="où Jarvis parle (ex. « CABLE Input » pour Voicemod) ; « defaut » pour revenir aux haut-parleurs")
     setup.add_argument("--micro", metavar="NOM", help="micro utilisé par Jarvis ; « defaut » pour revenir au micro Windows")
     setup.add_argument("--dossier-musique", metavar="DOSSIER", help="dossier de ta musique locale")
     setup.add_argument("--elevenlabs", metavar="CLE", help="enregistrer ta clé ElevenLabs")
-    setup.add_argument("--telegram", metavar="JETON", help="enregistrer le jeton de ton bot Telegram")
-    setup.add_argument("--telegram-autoriser", metavar="ID", help="autoriser ton compte Telegram")
     setup.add_argument("--installer", action="store_true",
                        help="tout installer : icône sur le Bureau et le menu Démarrer, boule, lancement au démarrage")
     setup.add_argument("--raccourcis", action="store_true", help="créer l'icône Jarvis (Bureau + menu Démarrer)")
-    setup.add_argument("--configurer-whatsapp", action="store_true", help="relier WhatsApp (voir README)")
+    setup.add_argument("--configurer-sms", action="store_true", help="relier ton téléphone Android pour les SMS")
     setup.add_argument("--installer-demarrage", action="store_true", help="lancer Jarvis à chaque démarrage")
     setup.add_argument("--retirer-demarrage", action="store_true", help="ne plus lancer Jarvis au démarrage")
 
@@ -350,7 +346,7 @@ def main() -> None:
     run.add_argument("--sans-orbe", action="store_true", help="ne plus afficher la boule (mémorisé)")
     run.add_argument("--interface", action="store_true", help="ouvrir l'interface dans le navigateur")
     run.add_argument("--sans-micro", action="store_true",
-                     help="pas d'écoute au micro (interface, Telegram et WhatsApp seulement)")
+                     help="pas d'écoute au micro (interface seulement)")
     run.add_argument("--texte", action="store_true", help="écrire au clavier au lieu de parler")
     run.add_argument("--muet", action="store_true", help="ne pas lire les réponses à voix haute")
     run.add_argument("--toujours", action="store_true", help="répondre sans attendre « Jarvis »")
@@ -377,8 +373,7 @@ def main() -> None:
 
     # --- réglages ponctuels ------------------------------------------------
     one_shot = False
-    for flag, key in (("cle", "cle_api"), ("elevenlabs", "elevenlabs_cle"), ("telegram", "telegram_token"),
-                      ("telegram_autoriser", "telegram_utilisateur"),
+    for flag, key in (("cle", "cle_api"), ("elevenlabs", "elevenlabs_cle"),
                       ("dossier_musique", "dossier_musique"),
                       ("sortie_audio", "sortie_audio"), ("micro", "micro"), ("modele", "modele"), ("effort", "effort"), ("effet", "effet"),
                       ("vitesse_voix", "vitesse_voix"), ("hauteur_voix", "hauteur_voix")):
@@ -410,12 +405,10 @@ def main() -> None:
         google_tools.connect(args.connecter_google or None)
         print("Terminé ! Redémarre Jarvis pour qu'il utilise ses nouveaux outils Google.")
         return
-    if args.configurer_whatsapp:
-        from . import whatsapp
+    if args.configurer_sms:
+        from .tools import sms
 
-        return whatsapp.configure()
-    if args.connecter_telegram_perso:
-        return telegram_perso.connect_interactive()
+        return sms.configure()
     if args.installer or args.raccourcis:
         if args.installer:
             config.save("orbe", "oui")
@@ -471,7 +464,7 @@ def main() -> None:
 
     def assistant() -> None:
         if args.sans_micro:
-            print("Jarvis tourne (interface, Telegram, WhatsApp). Ctrl+C pour arrêter.")
+            print("Jarvis tourne (interface). Ctrl+C pour arrêter.")
             threading.Event().wait()
         Jarvis(args).run()
 

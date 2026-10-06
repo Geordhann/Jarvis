@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import getpass
 
-from . import autostart, config, profile, telegram_perso, voices
+from . import autostart, config, profile, voices
 from .tools import media
 from .tools import google as google_tools
 
@@ -78,38 +78,18 @@ def run() -> None:
         except Exception as exc:
             print(f"Connexion impossible : {exc}")
 
-    _title("5. Telegram")
-    if _yes("Configurer Telegram ?", bool(config.get("telegram_token"))):
-        print("Dans Telegram, écris à @BotFather → /newbot → choisis un nom → copie le jeton.")
-        token = _ask("Jeton du bot", secret=True)
-        if token:
-            config.save("telegram_token", token)
-        print("Lance Jarvis puis envoie /start à ton bot : il te donnera ton identifiant.")
-        user = _ask("Ton identifiant Telegram (Entrée si tu ne l'as pas encore)", config.get("telegram_utilisateur"))
-        if user:
-            config.save("telegram_utilisateur", user)
+    _title("5. SMS (téléphone Android)")
+    if _yes("Configurer l'envoi de SMS ? (appli SMS Gateway sur ton Android, voir README)", False):
+        from .tools import sms
 
-    _title("6. WhatsApp")
-    if _yes("Configurer WhatsApp ? (compte Meta développeur et ngrok nécessaires, voir README)", False):
-        from . import whatsapp
+        sms.configure()
 
-        whatsapp.configure()
-
-    _title("7. Tes messages Telegram personnels")
-    print("Pour que Jarvis lise et envoie TES messages Telegram (pas seulement ceux du bot).")
-    if _yes("Connecter ton compte Telegram perso ?", False):
-        print("Sur https://my.telegram.org → API development tools : crée une app, note api_id et api_hash.")
-        try:
-            telegram_perso.connect_interactive()
-        except Exception as exc:
-            print(f"Connexion impossible : {exc}")
-
-    _title("8. Musique")
+    _title("6. Musique")
     folder = _ask("Dossier de ta musique sur l'ordinateur", str(media.music_dir()))
     config.save("dossier_musique", folder)
     print("Si un morceau n'y est pas, Jarvis le lance sur YouTube.")
 
-    _title("9. Démarrage automatique")
+    _title("7. Démarrage automatique")
     if _yes("Créer l'icône Jarvis sur le Bureau et dans le menu Démarrer ?"):
         try:
             for path in autostart.create_shortcuts():
