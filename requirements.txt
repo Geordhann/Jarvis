@@ -19,3 +19,5 @@ pynput
 telethon
 # Boule animée à l'écran
 PySide6
+# Effets sur la voix (droïde, robot…)
+pedalboard

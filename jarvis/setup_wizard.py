@@ -64,6 +64,10 @@ def run() -> None:
     if voice:
         voices.save_voice(voice)
 
+    effect = _ask("Effet sur la voix : aucun, ia, droide, tactique, robot", config.get("effet", "aucun"))
+    if effect in ("aucun", "ia", "droide", "tactique", "robot"):
+        config.save("effet", effect)
+
     _title("4. Gmail et Google Agenda")
     if google_tools.is_connected():
         print("Déjà connecté.")

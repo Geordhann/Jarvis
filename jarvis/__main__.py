@@ -44,6 +44,8 @@ PLAY_RE = re.compile(r"^(?:mets|lance|joue)(?:-moi)?\s+(?:de la |la |une |un )?"
 ANNOUNCE_OFF_RE = re.compile(r"\b(arrete|stoppe|desactive|coupe) les annonces\b")
 ORB_HIDE_RE = re.compile(r"\b(cache[- ]toi|masque[- ]toi|cache la boule|masque la boule|disparais)\b")
 ORB_SHOW_RE = re.compile(r"\b(montre[- ]toi|affiche[- ]toi|affiche la boule|montre la boule|apparais)\b")
+EFFECT_RE = re.compile(r"\b(?:effet|mode|voix (?:de )?)\s*(droide|tactique|robot|ia)\b")
+EFFECT_OFF_RE = re.compile(r"\b(enleve|retire|coupe|supprime) l'effet\b|\bvoix normale\b|\bsans effet\b")
 ANNOUNCE_ON_RE = re.compile(r"\b(active|reactive|remets) les annonces\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
 
@@ -83,8 +85,7 @@ class Jarvis:
     def run(self) -> None:
         if not self.voice.muted:
             announcer.start(self.voice.say)
-        hint = "" if self.always_listen or self.ears is None else " Dites « Jarvis » suivi de votre demande."
-        self.voice.say(f"Bonjour {self.title}. Tous les systèmes sont opérationnels.{hint}")
+        self.voice.say(f"Bonjour {self.title}. Tous les systèmes sont opérationnels.")
         self.voice.wait()
 
         while True:
@@ -113,7 +114,7 @@ class Jarvis:
         if self.ears is None:
             return input("VOUS › ")
         awake = time.monotonic() < max(self.awake_until, state.awake_until())
-        print("… je vous écoute" if awake else "… (en veille, dites « Jarvis »)")
+        print("… je vous écoute" if awake else "… en veille")
         state.set(state.LISTENING if awake else state.IDLE)
         text = self.ears.listen(timeout=FOLLOW_UP_SECONDS if awake else None)
         if text:
@@ -152,6 +153,11 @@ class Jarvis:
         if any(w in plain for w in RESET_WORDS):
             sessions.reset("voix")
             self.voice.say("C'est oublié. On repart de zéro.")
+            return True
+        effect = EFFECT_RE.search(plain)
+        if effect or EFFECT_OFF_RE.search(plain):
+            config.save("effet", effect.group(1) if effect else "aucun")
+            self.voice.say("Effet activé. Comment me trouvez-vous ?" if effect else "Voix normale rétablie.")
             return True
         if self._handle_voice(request, plain) or self._handle_media(request, plain):
             return True
@@ -259,6 +265,23 @@ def _already_running() -> bool:
         return False
 
 
+def try_effects(muted: bool) -> None:
+    """Fait entendre chaque effet de voix, puis enregistre celui qu'on choisit."""
+    from . import effects
+
+    names = list(effects.PRESETS)
+    voice = Voice(muted=muted)
+    for i, name in enumerate(names, 1):
+        print(f"  {i}. {name} — {effects.PRESETS[name]}")
+        config.save("effet", name)
+        voice.say(f"Effet {name}. Bonjour, je suis Jarvis. Tous les systèmes sont opérationnels.")
+        voice.wait()
+    choice = input("\nNuméro de l'effet à garder (Entrée = aucun) : ").strip()
+    chosen = names[int(choice) - 1] if choice.isdigit() and 1 <= int(choice) <= len(names) else "aucun"
+    config.save("effet", chosen)
+    print(f"Effet enregistré : {chosen}")
+
+
 def choose_voice_menu(muted: bool) -> None:
     """Menu interactif : écouter chaque voix et choisir celle de Jarvis."""
     names = list(voices.catalog())
@@ -319,6 +342,9 @@ def main() -> None:
     run.add_argument("--muet", action="store_true", help="ne pas lire les réponses à voix haute")
     run.add_argument("--toujours", action="store_true", help="répondre sans attendre « Jarvis »")
     run.add_argument("--voix", default=None, help="voix pour cette session (Daniel, Henri, Denise…)")
+    run.add_argument("--effet", choices=["aucun", "ia", "droide", "tactique", "robot"],
+                     help="effet sur la voix, sans Voicemod (mémorisé)")
+    run.add_argument("--essayer-effets", action="store_true", help="écouter chaque effet de voix")
     run.add_argument("--choisir-voix", action="store_true", help="écouter les voix et choisir")
     run.add_argument("--liste-voix", action="store_true", help="afficher les voix disponibles")
     run.add_argument("--modele", choices=list(MODELS),
@@ -339,12 +365,12 @@ def main() -> None:
     for flag, key in (("cle", "cle_api"), ("elevenlabs", "elevenlabs_cle"), ("telegram", "telegram_token"),
                       ("telegram_autoriser", "telegram_utilisateur"),
                       ("dossier_musique", "dossier_musique"),
-                      ("sortie_audio", "sortie_audio"), ("micro", "micro"), ("modele", "modele"), ("effort", "effort")):
+                      ("sortie_audio", "sortie_audio"), ("micro", "micro"), ("modele", "modele"), ("effort", "effort"), ("effet", "effet")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
             print(f"Réglage « {key} » enregistré.")
-            one_shot = one_shot or flag not in ("modele", "effort")
+            one_shot = one_shot or flag not in ("modele", "effort", "effet")
     for key in ("sortie_audio", "micro"):
         if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
             config.save(key, None)
@@ -393,6 +419,8 @@ def main() -> None:
         from .audio_devices import print_devices
 
         return print_devices()
+    if args.essayer_effets:
+        return try_effects(args.muet)
     if args.liste_voix:
         for name in voices.catalog():
             print(f"  {voices.describe(name)}")

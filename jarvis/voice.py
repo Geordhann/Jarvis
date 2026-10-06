@@ -7,7 +7,7 @@ import queue
 import tempfile
 import threading
 
-from . import state, tts
+from . import effects, state, tts
 
 
 class Voice:
@@ -18,7 +18,7 @@ class Voice:
         self.voice = voice  # prénom ou identifiant ; None = voix enregistrée / par défaut
         self.muted = muted
         self._texts: queue.Queue[str] = queue.Queue()
-        self._audio: queue.Queue[tuple[str, bytes | None]] = queue.Queue()
+        self._audio: queue.Queue[tuple[str, bytes | None, str]] = queue.Queue()
         self._engine = None
         self._mixer_ready = False
         threading.Thread(target=self._synth_loop, daemon=True).start()
@@ -38,20 +38,20 @@ class Voice:
         while True:
             text = self._texts.get()
             try:
-                audio = tts.synthesize(text, self.voice)
+                audio, ext = effects.apply(tts.synthesize(text, self.voice))
             except Exception as exc:
                 print(f"[voix] synthèse impossible ({exc}), voix hors-ligne.")
-                audio = None
-            self._audio.put((text, audio))
+                audio, ext = None, "mp3"
+            self._audio.put((text, audio, ext))
             self._texts.task_done()
 
     def _play_loop(self) -> None:
         while True:
-            text, audio = self._audio.get()
+            text, audio, ext = self._audio.get()
             state.set(state.SPEAKING, text)
             try:
                 if audio:
-                    self._play_mp3(audio)
+                    self._play(audio, ext)
                 else:
                     self._speak_offline(text)
             except Exception as exc:  # la voix ne doit jamais faire planter Jarvis
@@ -61,7 +61,7 @@ class Voice:
                 if self._audio.empty() and self._texts.empty():
                     state.set(state.IDLE)
 
-    def _play_mp3(self, audio: bytes) -> None:
+    def _play(self, audio: bytes, ext: str = "mp3") -> None:
         import pygame
 
         if not self._mixer_ready:
@@ -70,7 +70,7 @@ class Voice:
             device = output_device()  # ex. « CABLE Input » pour passer par Voicemod
             pygame.mixer.init(devicename=device) if device else pygame.mixer.init()
             self._mixer_ready = True
-        fd, path = tempfile.mkstemp(suffix=".mp3")
+        fd, path = tempfile.mkstemp(suffix=f".{ext}")
         try:
             with os.fdopen(fd, "wb") as f:
                 f.write(audio)

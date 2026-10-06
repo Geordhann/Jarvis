@@ -86,7 +86,24 @@ python -m jarvis --choisir-voix      # écouter et choisir (Daniel = le plus « 
 ```
 Tu peux aussi utiliser une de tes voix ElevenLabs perso : `python -m jarvis --voix ID_DE_LA_VOIX`.
 
-### Voix de Jarvis dans Voicemod (effet droïde, robot…)
+### Effet droïde / robot sur la voix (intégré, sans Voicemod)
+```powershell
+python -m jarvis --essayer-effets     # écoute chaque effet et garde ton préféré
+python -m jarvis --effet tactique     # ou directement : aucun, ia, droide, tactique, robot
+```
+Ou à la voix : « Jarvis, mets l'effet droïde », « Jarvis, mode tactique », « Jarvis, voix normale ».
+
+| Effet | Rendu |
+|---|---|
+| `ia` | légère touche synthétique, comme le Jarvis des films |
+| `droide` | métallique et un peu nasillard |
+| `tactique` | droïde tactique : plus grave, froid et métallique |
+| `robot` | très métallique, façon vieux synthétiseur |
+
+L'effet s'applique à la voix de l'ordinateur et de l'interface (pas aux vocaux Telegram/WhatsApp).
+
+### Voix de Jarvis dans Voicemod (facultatif)
+Seulement si tu veux un effet précis de Voicemod : l'effet intégré ci-dessus suffit dans la plupart des cas.
 Voicemod transforme un micro. On fait donc « parler » Jarvis dans un micro virtuel :
 
 ```

@@ -6,7 +6,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from . import config, sessions, state, telegram_bot, tts, voices, whatsapp
+from . import config, effects, sessions, state, telegram_bot, tts, voices, whatsapp
 from .tools import google as google_tools
 
 PORT = 8765
@@ -69,8 +69,8 @@ async def start():
 
     async def speech(request: web.Request) -> web.Response:
         text = (await request.json()).get("text", "")[:2000]
-        audio = await asyncio.to_thread(tts.synthesize, text)
-        return web.Response(body=audio, content_type="audio/mpeg")
+        audio, ext = await asyncio.to_thread(lambda: effects.apply(tts.synthesize(text)))
+        return web.Response(body=audio, content_type="audio/wav" if ext == "wav" else "audio/mpeg")
 
     async def reset(request: web.Request) -> web.Response:
         sessions.reset("web")
