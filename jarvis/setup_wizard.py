@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import getpass
-import secrets
 
 from . import autostart, config, profile, telegram_perso, voices
 from .tools import media
@@ -91,18 +90,10 @@ def run() -> None:
             config.save("telegram_utilisateur", user)
 
     _title("6. WhatsApp")
-    if _yes("Configurer WhatsApp ? (compte Meta développeur nécessaire, voir README)", bool(config.get("whatsapp_token"))):
-        config.save("whatsapp_token", _ask("Jeton d'accès (permanent) de l'app Meta", secret=True)
-                    or config.get("whatsapp_token"))
-        config.save("whatsapp_numero_id", _ask("Identifiant du numéro de téléphone (Phone number ID)",
-                                               config.get("whatsapp_numero_id")))
-        config.save("whatsapp_secret_app", _ask("Clé secrète de l'app (App secret)", secret=True)
-                    or config.get("whatsapp_secret_app"))
-        config.save("whatsapp_mon_numero", _ask("TON numéro WhatsApp, format international (ex. 33612345678)",
-                                                config.get("whatsapp_mon_numero")))
-        verify = config.get("whatsapp_verification") or secrets.token_urlsafe(16)
-        config.save("whatsapp_verification", verify)
-        print(f"Dans Meta, URL du webhook : https://<ton-tunnel>/whatsapp — jeton de vérification : {verify}")
+    if _yes("Configurer WhatsApp ? (compte Meta développeur et ngrok nécessaires, voir README)", False):
+        from . import whatsapp
+
+        whatsapp.configure()
 
     _title("7. Tes messages Telegram personnels")
     print("Pour que Jarvis lise et envoie TES messages Telegram (pas seulement ceux du bot).")

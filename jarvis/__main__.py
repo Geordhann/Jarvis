@@ -340,6 +340,7 @@ def main() -> None:
     setup.add_argument("--installer", action="store_true",
                        help="tout installer : icône sur le Bureau et le menu Démarrer, boule, lancement au démarrage")
     setup.add_argument("--raccourcis", action="store_true", help="créer l'icône Jarvis (Bureau + menu Démarrer)")
+    setup.add_argument("--configurer-whatsapp", action="store_true", help="relier WhatsApp (voir README)")
     setup.add_argument("--installer-demarrage", action="store_true", help="lancer Jarvis à chaque démarrage")
     setup.add_argument("--retirer-demarrage", action="store_true", help="ne plus lancer Jarvis au démarrage")
 
@@ -409,6 +410,10 @@ def main() -> None:
         google_tools.connect(args.connecter_google or None)
         print("Terminé ! Redémarre Jarvis pour qu'il utilise ses nouveaux outils Google.")
         return
+    if args.configurer_whatsapp:
+        from . import whatsapp
+
+        return whatsapp.configure()
     if args.connecter_telegram_perso:
         return telegram_perso.connect_interactive()
     if args.installer or args.raccourcis:

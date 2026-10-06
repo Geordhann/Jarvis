@@ -168,23 +168,29 @@ Seul ton compte peut lui parler. Envoie du texte ou des vocaux (il répond alors
 `/nouveau` efface la conversation en cours.
 
 ### WhatsApp
-Plus long que Telegram, car Meta impose un compte développeur :
-1. <https://developers.facebook.com/> → *Créer une app* → type **Business** → ajoute le produit **WhatsApp**.
-2. Dans *WhatsApp → Configuration de l'API* : note le **Phone number ID**, ajoute ton propre numéro
-   comme destinataire, et crée un **jeton d'accès permanent** (utilisateur système dans Meta Business).
-3. Dans *Paramètres de l'app → Général* : note la **clé secrète** (App secret).
-4. `python -m jarvis --configurer` → étape WhatsApp : colle ces informations. Il t'affiche un
-   **jeton de vérification**.
-5. Rends le port 8766 accessible depuis Internet avec un tunnel, par exemple :
-   ```bash
-   cloudflared tunnel --url http://localhost:8766      # ou : ngrok http 8766
-   ```
-6. Dans Meta, *WhatsApp → Configuration → Webhook* : URL `https://<adresse-du-tunnel>/whatsapp`,
-   le jeton de vérification de l'étape 4, puis abonne-toi au champ **messages**.
+Plus long que Telegram (≈ 25 min, une seule fois), car Meta impose un compte développeur.
+1. **ngrok** (adresse publique gratuite pour que Meta joigne ton PC) : crée un compte sur
+   <https://ngrok.com>, puis dans PowerShell `winget install ngrok.ngrok` et
+   `ngrok config add-authtoken TON_AUTHTOKEN` (visible dans le tableau de bord ngrok).
+   Dans le tableau de bord → *Domains*, récupère ton **domaine gratuit** (ex. `truc-machin.ngrok-free.app`).
+2. <https://developers.facebook.com/> → *Mes apps* → **Créer une app** → cas d'usage
+   « Se connecter avec les clients via WhatsApp » → crée ou choisis un portefeuille business.
+3. *WhatsApp → Configuration de l'API* : Meta fournit un **numéro de test gratuit**. Note le
+   **Phone number ID**, ajoute **ton** numéro dans la liste « À », et génère un **jeton d'accès**.
+4. *Paramètres de l'app → Général* : note la **clé secrète** (App secret).
+5. `python -m jarvis --configurer-whatsapp` : colle ces informations et ton domaine ngrok.
+   Il affiche l'**URL de rappel** et le **jeton de vérification**.
+6. Relance Jarvis (il démarre ngrok tout seul), puis dans Meta *WhatsApp → Configuration → Webhook* :
+   colle l'URL et le jeton → *Vérifier et enregistrer* → *Gérer* → abonne-toi à **messages**.
+7. Sur ton téléphone, envoie « Bonjour » au numéro de test : Jarvis répond.
 
-Seuls les messages signés par Meta et venant de **ton** numéro sont traités. L'interface (port 8765)
-n'est jamais exposée par ce tunnel. La messagerie WhatsApp Business peut être facturée par Meta
-selon le volume (les réponses dans les 24 h à tes messages sont en général gratuites).
+Le jeton d'accès de l'étape 3 expire au bout de **24 h**. Pour un jeton permanent : *Paramètres business →
+Utilisateurs système* → crée un utilisateur système admin → *Ajouter des éléments* → ton app (contrôle total)
+→ *Générer un jeton* (expiration : jamais, autorisations `whatsapp_business_messaging` et
+`whatsapp_business_management`), puis relance `--configurer-whatsapp`.
+
+Seuls les messages signés par Meta et venant de **ton** numéro sont traités ; l'interface (port 8765)
+n'est jamais exposée par le tunnel. Les réponses à tes messages (dans les 24 h) sont gratuites.
 
 ### Musique
 Rien à configurer : « Jarvis, mets de la musique de Daft Punk » cherche d'abord dans ton dossier
@@ -395,6 +401,7 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--configurer` | configuration guidée |
 | `--profil` | modifier « qui tu es » |
 | `--connecter-google FICHIER` | relier Gmail et Agenda |
+| `--configurer-whatsapp` | relier WhatsApp (numéro Meta + tunnel ngrok lancé automatiquement) |
 | `--connecter-telegram-perso` | relier ton compte Telegram (lire et envoyer tes messages) |
 | `--dossier-musique DOSSIER` | dossier de ta musique locale |
 | `--elevenlabs CLE`, `--telegram JETON`, `--telegram-autoriser ID`, `--cle CLE` | enregistrer une clé |

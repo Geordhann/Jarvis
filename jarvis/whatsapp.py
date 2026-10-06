@@ -62,6 +62,79 @@ def download_media(media_id: str) -> bytes:
     return media.content
 
 
+def start_tunnel() -> None:
+    """Lance ngrok en arrière-plan (sans fenêtre) pour que Meta puisse joindre le webhook.
+
+    Il faut un domaine ngrok fixe (gratuit) enregistré avec --configurer-whatsapp.
+    """
+    import shutil
+    import subprocess
+    import sys
+
+    domain = config.get("whatsapp_domaine_ngrok")
+    if not domain:
+        return
+    exe = config.get("ngrok_chemin") or shutil.which("ngrok")
+    if not exe:
+        print("[whatsapp] ngrok introuvable : installe-le (winget install ngrok.ngrok) pour recevoir les messages.")
+        return
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+    subprocess.Popen([exe, "http", f"--url={domain}", str(PORT)], stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, creationflags=flags)
+    print(f"[whatsapp] tunnel ngrok lancé : https://{domain}/whatsapp")
+
+
+def check() -> None:
+    """Vérifie le jeton et l'identifiant du numéro auprès de Meta."""
+    try:
+        response = requests.get(f"{GRAPH}/{config.get('whatsapp_numero_id')}", headers=_auth(), timeout=20,
+                                params={"fields": "display_phone_number,verified_name"})
+    except requests.RequestException as exc:
+        print(f"✘ Impossible de joindre Meta ({type(exc).__name__}) : vérifie la connexion Internet.")
+        return
+    if response.ok:
+        data = response.json()
+        print(f"✔ Meta répond : numéro {data.get('display_phone_number')} ({data.get('verified_name', '')})")
+    else:
+        try:
+            error = response.json().get("error", {}).get("message", response.text)
+        except ValueError:
+            error = response.text[:200]
+        print(f"✘ Meta refuse : {error}")
+        print("  → Vérifie le jeton d'accès (il expire au bout de 24 h s'il est temporaire) et le Phone number ID.")
+
+
+def configure() -> None:
+    """Assistant WhatsApp : python -m jarvis --configurer-whatsapp"""
+    import secrets
+
+    def ask(question: str, key: str, clean=lambda v: v) -> None:
+        current = config.get(key)
+        hint = " [déjà enregistré, Entrée pour garder]" if current else ""
+        value = input(f"{question}{hint} : ").strip()
+        if value:
+            config.save(key, clean(value))
+
+    print("━━━ Configuration WhatsApp ━━━ (les valeurs s'affichent : pas de capture d'écran)")
+    ask("1. Jeton d'accès Meta (Access token)", "whatsapp_token")
+    ask("2. Identifiant du numéro (Phone number ID)", "whatsapp_numero_id", lambda v: re.sub(r"\D", "", v))
+    ask("3. Clé secrète de l'app (App secret)", "whatsapp_secret_app", config.clean_key)
+    ask("4. TON numéro WhatsApp, format international sans + (ex. 33612345678)", "whatsapp_mon_numero",
+        lambda v: re.sub(r"\D", "", v))
+    ask("5. Ton domaine ngrok fixe (ex. truc-machin.ngrok-free.app)", "whatsapp_domaine_ngrok",
+        lambda v: re.sub(r"^https?://|/.*$", "", v.strip()))
+    verify = config.get("whatsapp_verification") or secrets.token_urlsafe(16)
+    config.save("whatsapp_verification", verify)
+    print("\033[2J\033[H", end="")  # efface l'écran : les jetons ne restent pas affichés
+    print("━━━ À recopier dans Meta → WhatsApp → Configuration → Webhook ━━━")
+    print(f"  URL de rappel        : https://{config.get('whatsapp_domaine_ngrok') or '<ton-domaine-ngrok>'}/whatsapp")
+    print(f"  Jeton de vérification : {verify}")
+    print("  Puis « Gérer » → abonne-toi au champ « messages ».\n")
+    if config.get("whatsapp_token") and config.get("whatsapp_numero_id"):
+        check()
+    print("Relance Jarvis : il lancera ngrok tout seul et répondra sur WhatsApp.")
+
+
 def handle_message(message: dict) -> None:
     """Traite un message entrant (appelé dans un thread)."""
     sender = message.get("from", "")
@@ -94,6 +167,8 @@ def handle_message(message: dict) -> None:
 
 async def start():
     from aiohttp import web
+
+    start_tunnel()
 
     async def verify(request: web.Request) -> web.Response:
         q = request.query
