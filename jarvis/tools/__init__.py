@@ -66,9 +66,10 @@ def boolean(description: str) -> dict:
 
 def all_tools(skills_map) -> list[Tool]:
     from .. import telegram_perso
-    from . import browser, google, media, utilities
+    from . import apps, browser, google, media, utilities
 
-    return [*google.tools(), *telegram_perso.tools(), *media.tools(), *utilities.tools(), *browser.tools(),
+    return [*google.tools(), *telegram_perso.tools(), *media.tools(), *apps.tools(), *utilities.tools(),
+            *browser.tools(),
             _skill_tool(skills_map), _reply_tool()]
 
 

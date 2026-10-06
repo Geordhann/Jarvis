@@ -3,7 +3,7 @@
 - Glisser avec la souris pour la déplacer (la position est mémorisée).
 - Clic : Jarvis t'écoute sans que tu dises « Jarvis ».
 - Double-clic : ouvre l'interface complète.
-- Clic droit : premier plan, masquer, quitter.
+- Clic droit : position (derrière les fenêtres, normale, premier plan), masquer, quitter.
 - Ctrl+Alt+J (partout dans Windows) : afficher / masquer.
 """
 
@@ -47,7 +47,11 @@ def run(on_quit=None) -> None:
     class Orb(QWidget):
         def __init__(self) -> None:
             super().__init__()
-            self.on_top = (config.get("orbe_premier_plan", "oui") or "oui") != "non"
+            # Où se place la boule : « derriere » (sur le bureau, sous les fenêtres), « normal »
+            # (comme une fenêtre classique) ou « devant » (toujours au premier plan).
+            legacy = "devant" if config.load().get("orbe_premier_plan") == "oui" else "derriere"
+            self.layer = config.get("orbe_plan") or legacy
+            self.last_lower = 0.0
             self._apply_flags()
             self.setAttribute(Qt.WA_TranslucentBackground)
             self.setWindowTitle("Jarvis")
@@ -66,8 +70,10 @@ def run(on_quit=None) -> None:
 
         def _apply_flags(self) -> None:
             flags = Qt.FramelessWindowHint | Qt.Tool
-            if self.on_top:
+            if self.layer == "devant":
                 flags |= Qt.WindowStaysOnTopHint
+            elif self.layer == "derriere":
+                flags |= Qt.WindowStaysOnBottomHint
             self.setWindowFlags(flags)
 
         def _restore_position(self) -> None:
@@ -78,13 +84,15 @@ def run(on_quit=None) -> None:
                 x, y = screen.right() - self.width() - 20, screen.bottom() - self.height() - 20
             self.move(x, y)
 
-        def toggle_on_top(self) -> None:
-            self.on_top = not self.on_top
-            config.save("orbe_premier_plan", "oui" if self.on_top else "non")
+        def set_layer(self, layer: str) -> None:
+            self.layer = layer
+            config.save("orbe_plan", layer)
             visible = self.isVisible()
             self._apply_flags()
             if visible:
                 self.show()
+                if layer == "derriere":
+                    self.lower()
 
         def toggle_visible(self) -> None:
             self.hide() if self.isVisible() else (self.show(), self.raise_())
@@ -103,6 +111,9 @@ def run(on_quit=None) -> None:
 
             now = time.monotonic()
             dt, self.last = now - self.last, now
+            if self.layer == "derriere" and now - self.last_lower > 2 and self.drag_from is None:
+                self.lower()  # reste sous les fenêtres, même après un clic
+                self.last_lower = now
             current, _, _ = state.get()
             self.angle = (self.angle + dt * 30 * SPEEDS.get(current, 1.0)) % 360
             # Pulsation de la voix (le son lui-même n'est pas analysé) ou respiration au repos.
@@ -248,9 +259,13 @@ def run(on_quit=None) -> None:
 
         def contextMenuEvent(self, event) -> None:
             menu = QMenu(self)
-            on_top = QAction("Toujours au premier plan", menu, checkable=True, checked=self.on_top)
-            on_top.triggered.connect(self.toggle_on_top)
-            menu.addAction(on_top)
+            place = menu.addMenu("Position")
+            for layer, label in (("derriere", "Derrière les fenêtres (sur le bureau)"),
+                                 ("normal", "Comme une fenêtre normale"),
+                                 ("devant", "Toujours au premier plan")):
+                action = QAction(label, place, checkable=True, checked=self.layer == layer)
+                action.triggered.connect(lambda *_, l=layer: self.set_layer(l))
+                place.addAction(action)
             menu.addAction("Masquer (Ctrl+Alt+J pour revenir)", lambda *_: self.hide())
             menu.addAction("Ouvrir l'interface complète", lambda *_: self.open_interface())
             menu.addSeparator()

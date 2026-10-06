@@ -26,3 +26,5 @@ psutil
 mss
 Pillow
 pyperclip
+# Contrôle des fenêtres (Windows)
+pygetwindow; sys_platform == "win32"

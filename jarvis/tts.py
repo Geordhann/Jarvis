@@ -36,6 +36,8 @@ def _eleven_tts(text: str, voice_id: str) -> bytes:
             "text": text,
             "model_id": config.get("elevenlabs_modele", "eleven_multilingual_v2"),
             "language_code": "fr",
+            # ElevenLabs accepte une vitesse de 0,7 à 1,2 (pas de réglage de hauteur).
+            "voice_settings": {"speed": max(0.7, min(1.2, 1 + int(voices.rate()[:-1]) / 100))},
         },
         timeout=60,
     )
@@ -57,7 +59,8 @@ def _edge_tts(text: str, voice_id: str) -> bytes:
 
     async def run() -> bytes:
         audio = bytearray()
-        async for chunk in edge_tts.Communicate(text, voice_id, rate="+5%").stream():
+        speech = edge_tts.Communicate(text, voice_id, rate=voices.rate(), pitch=voices.pitch())
+        async for chunk in speech.stream():
             if chunk["type"] == "audio":
                 audio.extend(chunk["data"])
         return bytes(audio)

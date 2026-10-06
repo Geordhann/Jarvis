@@ -151,8 +151,4 @@ def tools() -> list[Tool]:
              "Contrôle la musique ou la vidéo en cours : pause, lecture, suivant, précédent, volume, muet.",
              {"action": {"type": "string", "enum": list(MEDIA_ACTIONS)}},
              controle_media, ["action"]),
-        Tool("ouvrir_application",
-             "Ouvre une application installée sur l'ordinateur (Spotify, Calculatrice, Word, VS Code…).",
-             {"nom": string("nom de l'application")},
-             ouvrir_application, ["nom"]),
     ]

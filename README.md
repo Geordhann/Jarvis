@@ -254,6 +254,27 @@ boule → *Quitter*, ou « Jarvis, au revoir ». Journal en cas de souci : `~/.j
 **Google Keep** n'a pas d'accès officiel pour les comptes Gmail personnels : le carnet de notes de Jarvis
 le remplace. Pour une note dans Google Docs, demande « crée un document Google avec… ».
 
+### Contrôler tes applications
+| Tu dis | Jarvis |
+|---|---|
+| « Jarvis, ouvre Discord / Spotify / Word / Steam » | cherche l'appli dans le menu Démarrer et la lance |
+| « Jarvis, quelles fenêtres sont ouvertes ? » | liste les fenêtres |
+| « Jarvis, affiche Discord » / « réduis Chrome » / « agrandis Word » | passe d'une fenêtre à l'autre |
+| « Jarvis, ferme Discord » | ferme l'appli **après ta confirmation** |
+| « Jarvis, enregistre » / « nouvel onglet » / « montre le bureau » | raccourcis clavier (Ctrl+S, Ctrl+T, Win+D…) |
+| « Jarvis, écris "j'arrive dans 5 minutes" » | tape le texte là où se trouve le curseur |
+
+### Régler la voix
+22 voix gratuites (françaises, québécoises, belges, suisses, et des voix « multilingues » qui parlent
+français avec un léger accent : **Bryan**, à l'accent anglais, rappelle le Jarvis du film), plus les voix ElevenLabs.
+```powershell
+python -m jarvis --choisir-voix        # écouter et choisir
+python -m jarvis --vitesse-voix -10    # de -50 (lent) à 50 (rapide)
+python -m jarvis --hauteur-voix -20    # de -50 (grave) à 50 (aigu)
+python -m jarvis --essayer-effets      # + un effet : ia, droide, tactique, robot
+```
+À la voix : « Jarvis, parle plus lentement », « Jarvis, voix plus grave », « Jarvis, prends la voix de Bryan ».
+
 ## 3. Utilisation
 
 ```bash
@@ -293,7 +314,8 @@ il réfléchit et pulse quand il parle, avec ses phrases en sous-titre.
 - **Glisser** : la déplacer (position mémorisée).
 - **Clic** : Jarvis t'écoute sans que tu dises « Jarvis ».
 - **Double-clic** : ouvre l'interface complète.
-- **Clic droit** : *Toujours au premier plan* (décoche pour qu'elle passe derrière tes fenêtres), *Masquer*, *Quitter*.
+- **Clic droit → Position** : *Derrière les fenêtres* (par défaut, posée sur le bureau), *Comme une fenêtre
+  normale* ou *Toujours au premier plan*. Aussi : *Masquer*, *Quitter*.
 - **Ctrl+Alt+J** n'importe où : afficher / masquer. Ou à la voix : « Jarvis, cache-toi » / « Jarvis, montre-toi ».
 
 ### Démarrage automatique

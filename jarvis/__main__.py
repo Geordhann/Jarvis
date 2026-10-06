@@ -46,6 +46,8 @@ ORB_HIDE_RE = re.compile(r"\b(cache[- ]toi|masque[- ]toi|cache la boule|masque l
 ORB_SHOW_RE = re.compile(r"\b(montre[- ]toi|affiche[- ]toi|affiche la boule|montre la boule|apparais)\b")
 EFFECT_RE = re.compile(r"\b(?:effet|mode|voix (?:de )?)\s*(droide|tactique|robot|ia)\b")
 EFFECT_OFF_RE = re.compile(r"\b(enleve|retire|coupe|supprime) l'effet\b|\bvoix normale\b|\bsans effet\b")
+SPEED_RE = re.compile(r"\bparle (plus )?(vite|rapidement|lentement|doucement|moins vite)\b")
+PITCH_RE = re.compile(r"\bvoix (plus )?(grave|aigue|basse|haute)\b")
 ANNOUNCE_ON_RE = re.compile(r"\b(active|reactive|remets) les annonces\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
 
@@ -154,6 +156,15 @@ class Jarvis:
         if any(w in plain for w in RESET_WORDS):
             sessions.reset("voix")
             self.voice.say("C'est oublié. On repart de zéro.")
+            return True
+        speed, tone = SPEED_RE.search(plain), PITCH_RE.search(plain)
+        if speed or tone:
+            key, step, word = (("vitesse_voix", 10, speed.group(2)) if speed else ("hauteur_voix", 15, tone.group(2)))
+            down = word in ("lentement", "doucement", "moins vite", "grave", "basse")
+            value = int(float(re.sub(r"[^\d.+-]", "", config.get(key) or ("5" if speed else "0")) or 0))
+            value = max(-50, min(50, value + (-step if down else step)))
+            config.save(key, str(value))
+            self.voice.say("Comme ceci ?")
             return True
         effect = EFFECT_RE.search(plain)
         if effect or EFFECT_OFF_RE.search(plain):
@@ -345,6 +356,8 @@ def main() -> None:
     run.add_argument("--voix", default=None, help="voix pour cette session (Daniel, Henri, Denise…)")
     run.add_argument("--effet", choices=["aucun", "ia", "droide", "tactique", "robot"],
                      help="effet sur la voix, sans Voicemod (mémorisé)")
+    run.add_argument("--vitesse-voix", metavar="POURCENT", help="vitesse de la voix, ex. 10 ou -15 (mémorisé)")
+    run.add_argument("--hauteur-voix", metavar="HZ", help="hauteur de la voix, ex. -20 (plus grave) ou 15 (mémorisé)")
     run.add_argument("--essayer-effets", action="store_true", help="écouter chaque effet de voix")
     run.add_argument("--choisir-voix", action="store_true", help="écouter les voix et choisir")
     run.add_argument("--liste-voix", action="store_true", help="afficher les voix disponibles")
@@ -366,12 +379,13 @@ def main() -> None:
     for flag, key in (("cle", "cle_api"), ("elevenlabs", "elevenlabs_cle"), ("telegram", "telegram_token"),
                       ("telegram_autoriser", "telegram_utilisateur"),
                       ("dossier_musique", "dossier_musique"),
-                      ("sortie_audio", "sortie_audio"), ("micro", "micro"), ("modele", "modele"), ("effort", "effort"), ("effet", "effet")):
+                      ("sortie_audio", "sortie_audio"), ("micro", "micro"), ("modele", "modele"), ("effort", "effort"), ("effet", "effet"),
+                      ("vitesse_voix", "vitesse_voix"), ("hauteur_voix", "hauteur_voix")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
             print(f"Réglage « {key} » enregistré.")
-            one_shot = one_shot or flag not in ("modele", "effort", "effet")
+            one_shot = one_shot or flag not in ("modele", "effort", "effet", "vitesse_voix", "hauteur_voix")
     for key in ("sortie_audio", "micro"):
         if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
             config.save(key, None)

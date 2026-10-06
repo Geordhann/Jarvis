@@ -36,6 +36,16 @@ EDGE_VOICES: dict[str, tuple[str, str]] = {
     "Charline": ("fr-BE-CharlineNeural", "femme, Belgique"),
     "Fabrice": ("fr-CH-FabriceNeural", "homme, Suisse"),
     "Ariane": ("fr-CH-ArianeNeural", "femme, Suisse"),
+    # Voix « multilingues » : elles parlent français avec un léger accent étranger.
+    "Bryan": ("en-US-BrianMultilingualNeural", "homme, accent anglais, posé — très « Jarvis du film »"),
+    "Andrew": ("en-US-AndrewMultilingualNeural", "homme, accent américain, chaleureux"),
+    "William": ("en-AU-WilliamMultilingualNeural", "homme, accent australien"),
+    "Florian": ("de-DE-FlorianMultilingualNeural", "homme, accent allemand, grave"),
+    "Giuseppe": ("it-IT-GiuseppeMultilingualNeural", "homme, accent italien"),
+    "Hyunsu": ("ko-KR-HyunsuMultilingualNeural", "homme, accent coréen, calme"),
+    "Ava": ("en-US-AvaMultilingualNeural", "femme, accent américain"),
+    "Emma": ("en-US-EmmaMultilingualNeural", "femme, accent américain, douce"),
+    "Seraphina": ("de-DE-SeraphinaMultilingualNeural", "femme, accent allemand"),
 }
 
 
@@ -87,6 +97,21 @@ def resolve(name_or_id: str | None) -> tuple[str, str]:
 def describe(name: str) -> str:
     provider = "ElevenLabs" if name in ELEVEN_VOICES else "gratuite"
     return f"{name} ({catalog()[name][1]}, {provider})"
+
+
+def rate() -> str:
+    """Vitesse de la voix, en % (ex. « +10% », « -15% »)."""
+    return _signed(config.get("vitesse_voix") or "+5", "%")
+
+
+def pitch() -> str:
+    """Hauteur de la voix, en Hz (ex. « -20Hz » pour plus grave)."""
+    return _signed(config.get("hauteur_voix") or "0", "Hz")
+
+
+def _signed(value: str, unit: str) -> str:
+    number = int(float(re.sub(r"[^\d.+-]", "", value) or 0))
+    return f"{number:+d}{unit}"
 
 
 def load_saved_voice() -> str | None:
