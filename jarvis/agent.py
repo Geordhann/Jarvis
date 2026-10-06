@@ -133,7 +133,8 @@ class Agent:
         self.skills = skills.load_all()
         self.tools: dict[str, Tool] = {t.name: t for t in all_tools(self.skills)}
         tools_note = (
-            "Tu as accès à Gmail et Google Agenda de l'utilisateur." if google_tools.is_connected()
+            "Tu as accès à la suite Google de l'utilisateur : Gmail, Agenda, Drive (Docs, Sheets, Slides), "
+            "Tâches, Contacts et son compte YouTube (playlists, abonnements)." if google_tools.is_connected()
             else "Gmail et Google Agenda ne sont pas connectés : si on te le demande, explique qu'il "
                  "faut lancer « python -m jarvis --connecter-google »."
         )

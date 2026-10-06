@@ -275,6 +275,7 @@ def main() -> None:
     setup.add_argument("--connecter-google", nargs="?", const="", metavar="FICHIER_JSON",
                        help="relier Gmail et Google Agenda")
     setup.add_argument("--cle", metavar="CLE_API", help="enregistrer ta clé API Anthropic")
+    setup.add_argument("--tester-cle", action="store_true", help="vérifier que la clé Claude fonctionne")
     setup.add_argument("--connecter-telegram-perso", action="store_true",
                        help="relier ton compte Telegram personnel (lire et envoyer tes messages)")
     setup.add_argument("--liste-audio", action="store_true", help="afficher les sorties audio et les micros")
@@ -330,6 +331,11 @@ def main() -> None:
             config.save(key, None)
     config.apply_api_key()
 
+    if args.tester_cle or args.cle:
+        from .keycheck import run as check_key
+
+        check_key()
+        return
     if args.configurer:
         from .setup_wizard import run as wizard
 

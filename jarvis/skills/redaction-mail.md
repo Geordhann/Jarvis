@@ -3,7 +3,7 @@ nom: redaction-mail
 description: Rédiger, répondre ou envoyer un e-mail dans le style de l'utilisateur.
 ---
 1. Identifie le destinataire. Si seul un prénom est donné, cherche son adresse dans le profil,
-   la mémoire, ou les mails échangés (chercher_mails « from:prénom OR to:prénom »).
+   la mémoire, les contacts Google (contacts_chercher) ou les mails échangés (chercher_mails « from:prénom OR to:prénom »).
    S'il y a un doute, demande.
 2. Pour une réponse, lis d'abord le mail d'origine (lire_mail) et réponds dans le même fil.
 3. Rédige un mail clair : formule d'appel, message en paragraphes courts, formule de politesse,

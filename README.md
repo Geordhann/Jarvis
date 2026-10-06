@@ -61,6 +61,11 @@ et y revenir plus tard. Les détails de chaque étape sont ci-dessous.
 ### Clé Claude (obligatoire)
 <https://console.anthropic.com/> → *API Keys* → crée une clé, puis ajoute du crédit dans *Billing*.
 
+```powershell
+python -m jarvis --cle "sk-ant-..."    # enregistre la clé et la teste aussitôt
+python -m jarvis --tester-cle          # diagnostic : clé refusée, plus de crédit, réseau bloqué…
+```
+
 ### Ton profil : « apprends-lui qui tu es »
 ```bash
 python -m jarvis --profil
@@ -108,7 +113,9 @@ Chrome/Edge = `CABLE Input`.
 ### Gmail et Google Agenda
 Une seule fois, environ 10 minutes :
 1. Va sur <https://console.cloud.google.com/>, crée un projet (ex. « Jarvis »).
-2. *API et services* → *Bibliothèque* : active **Gmail API** et **Google Calendar API**.
+2. *API et services* → *Bibliothèque* : active ces 6 API (cherche-les une par une, bouton *Activer*) :
+   **Gmail API**, **Google Calendar API**, **Google Drive API**, **Google Tasks API**,
+   **People API** (contacts) et **YouTube Data API v3**.
 3. *Écran de consentement OAuth* : type **Externe**, ajoute ton adresse Gmail dans **Utilisateurs test**.
 4. *Identifiants* → *Créer des identifiants* → **ID client OAuth** → type **Application de bureau**
    → télécharge le fichier JSON.
@@ -119,7 +126,16 @@ Une seule fois, environ 10 minutes :
    Ton navigateur s'ouvre : connecte-toi et accepte (Google prévient que l'appli n'est pas vérifiée :
    c'est normal, c'est la tienne → *Continuer*).
 
-Jarvis peut alors lire, chercher, rédiger et envoyer des mails, et lire ou ajouter des événements.
+Jarvis peut alors utiliser toute ta suite Google :
+- **Gmail** : lire, chercher, rédiger, envoyer ;
+- **Agenda** : voir et ajouter des rendez-vous ;
+- **Drive / Docs / Sheets / Slides** : chercher un fichier, le lire, le résumer, créer un document ;
+- **Tâches** : ta liste de choses à faire (« Jarvis, ajoute acheter du pain à ma liste ») ;
+- **Contacts** : retrouver l'adresse ou le numéro de quelqu'un ;
+- **YouTube** : tes playlists et abonnements (« Jarvis, mets ma playlist sport »).
+
+Si Jarvis te dit qu'il manque des autorisations (après une mise à jour), relance simplement
+`python -m jarvis --connecter-google`.
 **Il annonce toujours un envoi ou un rendez-vous et attend ton « oui » avant de le faire.**
 Il ne peut pas supprimer définitivement de mail.
 
@@ -314,6 +330,7 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--connecter-telegram-perso` | relier ton compte Telegram (lire et envoyer tes messages) |
 | `--dossier-musique DOSSIER` | dossier de ta musique locale |
 | `--elevenlabs CLE`, `--telegram JETON`, `--telegram-autoriser ID`, `--cle CLE` | enregistrer une clé |
+| `--tester-cle` | vérifier que la clé Claude fonctionne |
 | `--modele opus/sonnet/haiku`, `--effort low…max` | cerveau (mémorisé) |
 | `--voix NOM`, `--choisir-voix`, `--liste-voix` | voix |
 | `--liste-audio`, `--sortie-audio NOM`, `--micro NOM` | choisir haut-parleur et micro (Voicemod) |

@@ -19,6 +19,11 @@ from . import Tool, ToolFailure, boolean, integer, string
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",  # lire, envoyer, brouillons (pas de suppression définitive)
     "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/drive.readonly",     # chercher et lire Drive, Docs, Sheets
+    "https://www.googleapis.com/auth/drive.file",         # créer des documents
+    "https://www.googleapis.com/auth/tasks",              # Google Tasks
+    "https://www.googleapis.com/auth/contacts.readonly",  # retrouver l'adresse d'un contact
+    "https://www.googleapis.com/auth/youtube.readonly",   # tes playlists et abonnements YouTube
 ]
 
 
@@ -60,6 +65,12 @@ def _service(api: str, version: str):
 
     if not is_connected():
         raise ToolFailure("Google n'est pas connecté. Lancer : python -m jarvis --connecter-google")
+    import json
+
+    granted = set(json.loads(token_path().read_text(encoding="utf-8")).get("scopes") or SCOPES)
+    if not set(SCOPES) <= granted:
+        raise ToolFailure("De nouvelles autorisations Google sont nécessaires (Drive, Tâches, YouTube…). "
+                          "Relancer une fois : python -m jarvis --connecter-google")
     creds = Credentials.from_authorized_user_file(str(token_path()), SCOPES)
     if not creds.valid:
         if creds.expired and creds.refresh_token:
@@ -209,6 +220,8 @@ def creer_evenement(titre: str, debut: str, fin: str, confirme_par_utilisateur: 
 def tools() -> list[Tool]:
     if not is_connected():
         return []
+    from .google_suite import tools as suite_tools
+
     confirm = boolean("true uniquement si l'utilisateur vient de dire oui explicitement à CETTE action")
     return [
         Tool("chercher_mails",
@@ -240,4 +253,5 @@ def tools() -> list[Tool]:
               "fin": string("AAAA-MM-JJTHH:MM, heure locale"), "confirme_par_utilisateur": confirm,
               "lieu": string("lieu (optionnel)"), "description": string("notes (optionnel)")},
              creer_evenement, ["titre", "debut", "fin", "confirme_par_utilisateur"]),
+        *suite_tools(),
     ]

@@ -34,9 +34,14 @@ def run() -> None:
     if config.load().get("cle_api") and not _yes("Une clé est déjà enregistrée. La changer ?", False):
         pass
     else:
-        key = _ask("Clé API Anthropic (sk-ant-…)", secret=True)
+        print("(La clé s'affiche en clair pour que tu vérifies le collage : ne fais pas de capture d'écran.)")
+        key = _ask("Clé API Anthropic (sk-ant-…), clic droit pour coller")
         if key:
             config.save("cle_api", key)
+            print("\033[2J\033[H", end="")  # efface l'écran : la clé ne reste pas affichée
+            from .keycheck import run as check_key
+
+            check_key()
     model = _ask("Modèle : opus (le plus intelligent), sonnet (2x moins cher), haiku (4x moins cher)",
                  config.get("modele", "opus"))
     config.save("modele", model)
