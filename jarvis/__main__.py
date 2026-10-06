@@ -13,7 +13,7 @@ import unicodedata
 
 import anthropic
 
-from . import announcer, autostart, config, profile, repliques, services, sessions, telegram_perso, voices
+from . import announcer, autostart, config, orb, state, profile, repliques, services, sessions, telegram_perso, voices
 from .agent import MODELS, french_date, french_time
 from .tools import ToolFailure, media
 from .voice import Voice
@@ -42,6 +42,8 @@ MEDIA_COMMANDS = [(re.compile(rf"^(?:{p})(?: s'il te plait| stp)?$"), a) for p, 
 PLAY_RE = re.compile(r"^(?:mets|lance|joue)(?:-moi)?\s+(?:de la |la |une |un )?"
                      r"(?:musique|chanson|morceau|playlist|son)\s*(?:de |du |des |d')?(.*)$|^joue(?:-moi)?\s+(.+)$")
 ANNOUNCE_OFF_RE = re.compile(r"\b(arrete|stoppe|desactive|coupe) les annonces\b")
+ORB_HIDE_RE = re.compile(r"\b(cache[- ]toi|masque[- ]toi|cache la boule|masque la boule|disparais)\b")
+ORB_SHOW_RE = re.compile(r"\b(montre[- ]toi|affiche[- ]toi|affiche la boule|montre la boule|apparais)\b")
 ANNOUNCE_ON_RE = re.compile(r"\b(active|reactive|remets) les annonces\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
 
@@ -110,8 +112,9 @@ class Jarvis:
     def _listen(self) -> str | None:
         if self.ears is None:
             return input("VOUS › ")
-        awake = time.monotonic() < self.awake_until
+        awake = time.monotonic() < max(self.awake_until, state.awake_until())
         print("… je vous écoute" if awake else "… (en veille, dites « Jarvis »)")
+        state.set(state.LISTENING if awake else state.IDLE)
         text = self.ears.listen(timeout=FOLLOW_UP_SECONDS if awake else None)
         if text:
             print(f"VOUS › {text}")
@@ -122,7 +125,8 @@ class Jarvis:
         if request is not None:
             return request
         # Pas de « Jarvis », mais on est dans la fenêtre de relance ou en mode toujours actif.
-        if self.always_listen or self.ears is None or time.monotonic() < self.awake_until:
+        awake_until = max(self.awake_until, state.awake_until())
+        if self.always_listen or self.ears is None or time.monotonic() < awake_until:
             return heard
         return None
 
@@ -150,6 +154,11 @@ class Jarvis:
             self.voice.say("C'est oublié. On repart de zéro.")
             return True
         if self._handle_voice(request, plain) or self._handle_media(request, plain):
+            return True
+        if ORB_HIDE_RE.search(plain) or ORB_SHOW_RE.search(plain):
+            hide = bool(ORB_HIDE_RE.search(plain))
+            state.request_visibility("masquer" if hide else "afficher")
+            self.voice.say("Je me fais discret." if hide else "Me voici.")
             return True
         if ANNOUNCE_OFF_RE.search(plain) or ANNOUNCE_ON_RE.search(plain):
             on = bool(ANNOUNCE_ON_RE.search(plain))
@@ -205,6 +214,7 @@ class Jarvis:
         return False
 
     def _ask_agent(self, request: str) -> None:
+        state.set(state.THINKING)
         try:
             self.agent.ask(request, on_sentence=self.voice.say)
         except anthropic.AuthenticationError:
@@ -279,6 +289,9 @@ def main() -> None:
     setup.add_argument("--retirer-demarrage", action="store_true", help="ne plus lancer Jarvis au démarrage")
 
     run = parser.add_argument_group("utilisation")
+    run.add_argument("--orbe", action="store_true",
+                     help="afficher la boule animée sur l'écran (mémorisé)")
+    run.add_argument("--sans-orbe", action="store_true", help="ne plus afficher la boule (mémorisé)")
     run.add_argument("--interface", action="store_true", help="ouvrir l'interface dans le navigateur")
     run.add_argument("--sans-micro", action="store_true",
                      help="pas d'écoute au micro (interface, Telegram et WhatsApp seulement)")
@@ -356,15 +369,39 @@ def main() -> None:
         print("Aucune clé API. Lance d'abord : python -m jarvis --configurer")
         return
 
+    if args.orbe or args.sans_orbe:
+        config.save("orbe", "oui" if args.orbe else "non")
+    use_orb = config.get("orbe") == "oui"
+    if use_orb and not orb.available():
+        print("La boule a besoin de PySide6 : pip install -r requirements.txt")
+        use_orb = False
+
     profile.ensure()
     services.start(open_interface=args.interface)
-    if args.sans_micro:
-        print("Jarvis tourne (interface, Telegram, WhatsApp). Ctrl+C pour arrêter.")
-        try:
+
+    def assistant() -> None:
+        if args.sans_micro:
+            print("Jarvis tourne (interface, Telegram, WhatsApp). Ctrl+C pour arrêter.")
             threading.Event().wait()
+        Jarvis(args).run()
+
+    if not use_orb:
+        try:
+            assistant()
         except KeyboardInterrupt:
-            return
-    Jarvis(args).run()
+            pass
+        return
+
+    # La boule doit tourner dans le fil principal ; l'assistant tourne à côté.
+    # « Au revoir » ou « Quitter » dans le menu de la boule arrêtent tout.
+    def assistant_then_exit() -> None:
+        try:
+            assistant()
+        finally:
+            os._exit(0)
+
+    threading.Thread(target=assistant_then_exit, daemon=True, name="assistant").start()
+    orb.run(on_quit=lambda: os._exit(0))
 
 
 if __name__ == "__main__":

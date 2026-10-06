@@ -17,3 +17,5 @@ aiohttp
 yt-dlp
 pynput
 telethon
+# Boule animée à l'écran
+PySide6

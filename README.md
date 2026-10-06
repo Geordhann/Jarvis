@@ -222,6 +222,18 @@ Le micro de la page fonctionne dans Chrome et Edge.
 
 Après chaque réponse, tu as 8 secondes pour enchaîner sans redire « Jarvis ».
 
+### La boule à l'écran (style Iron Man)
+```powershell
+python -m jarvis --orbe        # active la boule (mémorisé) ; --sans-orbe pour la retirer
+```
+Un réacteur animé flotte sur ton écran : bleu en veille, **orange quand il t'écoute**, il tourne vite quand
+il réfléchit et pulse quand il parle, avec ses phrases en sous-titre.
+- **Glisser** : la déplacer (position mémorisée).
+- **Clic** : Jarvis t'écoute sans que tu dises « Jarvis ».
+- **Double-clic** : ouvre l'interface complète.
+- **Clic droit** : *Toujours au premier plan* (décoche pour qu'elle passe derrière tes fenêtres), *Masquer*, *Quitter*.
+- **Ctrl+Alt+J** n'importe où : afficher / masquer. Ou à la voix : « Jarvis, cache-toi » / « Jarvis, montre-toi ».
+
 ### Démarrage automatique
 ```bash
 python -m jarvis --installer-demarrage    # à chaque allumage, en arrière-plan, sans fenêtre
@@ -305,5 +317,6 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--modele opus/sonnet/haiku`, `--effort low…max` | cerveau (mémorisé) |
 | `--voix NOM`, `--choisir-voix`, `--liste-voix` | voix |
 | `--liste-audio`, `--sortie-audio NOM`, `--micro NOM` | choisir haut-parleur et micro (Voicemod) |
+| `--orbe`, `--sans-orbe` | boule animée sur l'écran (mémorisé) |
 | `--interface`, `--sans-micro`, `--texte`, `--muet`, `--toujours` | façons de l'utiliser |
 | `--installer-demarrage`, `--retirer-demarrage` | lancement automatique |

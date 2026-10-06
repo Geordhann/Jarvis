@@ -7,7 +7,7 @@ import queue
 import tempfile
 import threading
 
-from . import tts
+from . import state, tts
 
 
 class Voice:
@@ -48,6 +48,7 @@ class Voice:
     def _play_loop(self) -> None:
         while True:
             text, audio = self._audio.get()
+            state.set(state.SPEAKING, text)
             try:
                 if audio:
                     self._play_mp3(audio)
@@ -57,6 +58,8 @@ class Voice:
                 print(f"[voix] erreur : {exc}")
             finally:
                 self._audio.task_done()
+                if self._audio.empty() and self._texts.empty():
+                    state.set(state.IDLE)
 
     def _play_mp3(self, audio: bytes) -> None:
         import pygame
