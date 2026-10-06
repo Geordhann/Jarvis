@@ -267,6 +267,10 @@ def main() -> None:
     setup.add_argument("--cle", metavar="CLE_API", help="enregistrer ta clé API Anthropic")
     setup.add_argument("--connecter-telegram-perso", action="store_true",
                        help="relier ton compte Telegram personnel (lire et envoyer tes messages)")
+    setup.add_argument("--liste-audio", action="store_true", help="afficher les sorties audio et les micros")
+    setup.add_argument("--sortie-audio", metavar="NOM",
+                       help="où Jarvis parle (ex. « CABLE Input » pour Voicemod) ; « defaut » pour revenir aux haut-parleurs")
+    setup.add_argument("--micro", metavar="NOM", help="micro utilisé par Jarvis ; « defaut » pour revenir au micro Windows")
     setup.add_argument("--dossier-musique", metavar="DOSSIER", help="dossier de ta musique locale")
     setup.add_argument("--elevenlabs", metavar="CLE", help="enregistrer ta clé ElevenLabs")
     setup.add_argument("--telegram", metavar="JETON", help="enregistrer le jeton de ton bot Telegram")
@@ -301,12 +305,16 @@ def main() -> None:
     one_shot = False
     for flag, key in (("cle", "cle_api"), ("elevenlabs", "elevenlabs_cle"), ("telegram", "telegram_token"),
                       ("telegram_autoriser", "telegram_utilisateur"),
-                      ("dossier_musique", "dossier_musique"), ("modele", "modele"), ("effort", "effort")):
+                      ("dossier_musique", "dossier_musique"),
+                      ("sortie_audio", "sortie_audio"), ("micro", "micro"), ("modele", "modele"), ("effort", "effort")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
             print(f"Réglage « {key} » enregistré.")
             one_shot = one_shot or flag not in ("modele", "effort")
+    for key in ("sortie_audio", "micro"):
+        if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
+            config.save(key, None)
     config.apply_api_key()
 
     if args.configurer:
@@ -331,6 +339,10 @@ def main() -> None:
         path = autostart.uninstall()
         print(f"Lancement automatique retiré ({path})." if path else "Jarvis n'était pas au démarrage.")
         return
+    if args.liste_audio:
+        from .audio_devices import print_devices
+
+        return print_devices()
     if args.liste_voix:
         for name in voices.catalog():
             print(f"  {voices.describe(name)}")

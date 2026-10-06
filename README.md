@@ -81,6 +81,30 @@ python -m jarvis --choisir-voix      # écouter et choisir (Daniel = le plus « 
 ```
 Tu peux aussi utiliser une de tes voix ElevenLabs perso : `python -m jarvis --voix ID_DE_LA_VOIX`.
 
+### Voix de Jarvis dans Voicemod (effet droïde, robot…)
+Voicemod transforme un micro. On fait donc « parler » Jarvis dans un micro virtuel :
+
+```
+Jarvis ──► CABLE Input ══ VB-Cable ══► CABLE Output ──► Voicemod (effet) ──► tes haut-parleurs
+```
+
+1. Installe **VB-Cable** (gratuit) : <https://vb-audio.com/Cable/> → décompresse → clic droit sur
+   `VBCABLE_Setup_x64.exe` → *Exécuter en tant qu'administrateur* → redémarre le PC.
+2. `python -m jarvis --liste-audio` pour voir les noms exacts, puis :
+   ```powershell
+   python -m jarvis --sortie-audio "CABLE Input"
+   python -m jarvis --micro "NOM DE TON VRAI MICRO"
+   ```
+   (le micro doit être ton **vrai** micro, pas « Voicemod Virtual Audio Device », sinon Jarvis s'entendrait lui-même).
+3. Dans **Voicemod** → *Paramètres* : **Micro** = `CABLE Output (VB-Audio Virtual Cable)`,
+   **Sortie** = tes haut-parleurs ou ton casque, et active **Hear myself / M'entendre**.
+4. Choisis un effet (Robot, Droid, Cyborg…) : Jarvis parle maintenant avec.
+
+Pour revenir à la normale : `python -m jarvis --sortie-audio defaut`.
+Tant que Voicemod écoute le câble, ta propre voix ne passe plus dans Voicemod (pour Discord, remets ton vrai micro).
+Pour l'**interface web**, fais pareil côté Windows : *Paramètres → Son → Mélangeur de volume* → sortie de
+Chrome/Edge = `CABLE Input`.
+
 ### Gmail et Google Agenda
 Une seule fois, environ 10 minutes :
 1. Va sur <https://console.cloud.google.com/>, crée un projet (ex. « Jarvis »).
@@ -280,5 +304,6 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--elevenlabs CLE`, `--telegram JETON`, `--telegram-autoriser ID`, `--cle CLE` | enregistrer une clé |
 | `--modele opus/sonnet/haiku`, `--effort low…max` | cerveau (mémorisé) |
 | `--voix NOM`, `--choisir-voix`, `--liste-voix` | voix |
+| `--liste-audio`, `--sortie-audio NOM`, `--micro NOM` | choisir haut-parleur et micro (Voicemod) |
 | `--interface`, `--sans-micro`, `--texte`, `--muet`, `--toujours` | façons de l'utiliser |
 | `--installer-demarrage`, `--retirer-demarrage` | lancement automatique |

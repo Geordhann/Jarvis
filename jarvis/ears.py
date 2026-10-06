@@ -13,7 +13,9 @@ class Ears:
         self.language = language
         self.recognizer = sr.Recognizer()
         self.recognizer.pause_threshold = 0.8
-        self.microphone = sr.Microphone()
+        from .audio_devices import input_index
+
+        self.microphone = sr.Microphone(device_index=input_index())
         with self.microphone as source:
             print("Calibrage du micro, silence s'il vous plaît…")
             self.recognizer.adjust_for_ambient_noise(source, duration=1)

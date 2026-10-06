@@ -62,7 +62,10 @@ class Voice:
         import pygame
 
         if not self._mixer_ready:
-            pygame.mixer.init()
+            from .audio_devices import output_device
+
+            device = output_device()  # ex. « CABLE Input » pour passer par Voicemod
+            pygame.mixer.init(devicename=device) if device else pygame.mixer.init()
             self._mixer_ready = True
         fd, path = tempfile.mkstemp(suffix=".mp3")
         try:
