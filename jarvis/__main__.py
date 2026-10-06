@@ -392,7 +392,7 @@ def main() -> None:
         from .tools import google as google_tools
 
         google_tools.connect(args.connecter_google or None)
-        print("Gmail et Google Agenda sont connectés.")
+        print("Terminé ! Redémarre Jarvis pour qu'il utilise ses nouveaux outils Google.")
         return
     if args.connecter_telegram_perso:
         return telegram_perso.connect_interactive()

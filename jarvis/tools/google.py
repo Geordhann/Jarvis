@@ -17,33 +17,33 @@ from .. import config
 from . import Tool, ToolFailure, boolean, integer, string
 
 SCOPES = [
-    "https://www.googleapis.com/auth/gmail.modify",  # lire, envoyer, brouillons (pas de suppression définitive)
+    "https://www.googleapis.com/auth/gmail.modify",       # lire, envoyer, brouillons (pas de suppression définitive)
     "https://www.googleapis.com/auth/calendar",
     "https://www.googleapis.com/auth/drive.readonly",     # chercher et lire Drive, Docs, Sheets
     "https://www.googleapis.com/auth/drive.file",         # créer des documents
     "https://www.googleapis.com/auth/tasks",              # Google Tasks
     "https://www.googleapis.com/auth/contacts.readonly",  # retrouver l'adresse d'un contact
-    "https://www.googleapis.com/auth/youtube.readonly",   # tes playlists et abonnements YouTube
 ]
+# Google refuse de mélanger YouTube et Drive dans une même autorisation :
+# YouTube a donc sa propre autorisation et son propre jeton.
+YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.readonly"]
 
 
 def client_secret_path() -> Path:
     return config.data_dir() / "google_client.json"
 
 
-def token_path() -> Path:
-    return config.data_dir() / "google_token.json"
+def token_path(youtube: bool = False) -> Path:
+    return config.data_dir() / ("youtube_token.json" if youtube else "google_token.json")
 
 
-def is_connected() -> bool:
-    return token_path().exists()
+def is_connected(youtube: bool = False) -> bool:
+    return token_path(youtube).exists()
 
 
 def connect(client_file: str | None = None) -> None:
-    """Ouvre le navigateur pour autoriser Jarvis sur ton compte Google."""
+    """Ouvre le navigateur deux fois : suite Google, puis YouTube (autorisations séparées)."""
     import shutil
-
-    from google_auth_oauthlib.flow import InstalledAppFlow
 
     if client_file:
         # Un glisser-déposer ou un collage ajoute souvent espaces, retours à la ligne ou guillemets.
@@ -54,32 +54,50 @@ def connect(client_file: str | None = None) -> None:
             f"Fichier d'identifiants Google introuvable : {client_secret_path()}\n"
             "Télécharge-le depuis Google Cloud Console (voir README, étape Gmail)."
         )
-    flow = InstalledAppFlow.from_client_secrets_file(str(client_secret_path()), SCOPES)
+    print("1/2 : autorise Gmail, Agenda, Drive, Tâches et Contacts dans le navigateur…")
+    _authorize(SCOPES, youtube=False)
+    print("✔ Suite Google connectée.")
+    print("2/2 : autorise maintenant YouTube (deuxième page dans le navigateur)…")
+    try:
+        _authorize(YOUTUBE_SCOPES, youtube=True)
+        print("✔ YouTube connecté.")
+    except Exception as exc:
+        print(f"YouTube non connecté ({exc}). Le reste fonctionne ; réessaie plus tard avec --connecter-google.")
+
+
+def _authorize(scopes: list[str], youtube: bool) -> None:
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    flow = InstalledAppFlow.from_client_secrets_file(str(client_secret_path()), scopes)
     creds = flow.run_local_server(port=0, prompt="consent")
-    token_path().write_text(creds.to_json(), encoding="utf-8")
-    token_path().chmod(0o600)
+    token_path(youtube).write_text(creds.to_json(), encoding="utf-8")
+    token_path(youtube).chmod(0o600)
 
 
 def _service(api: str, version: str):
+    import json
+
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
 
-    if not is_connected():
-        raise ToolFailure("Google n'est pas connecté. Lancer : python -m jarvis --connecter-google")
-    import json
-
-    granted = set(json.loads(token_path().read_text(encoding="utf-8")).get("scopes") or SCOPES)
-    if not set(SCOPES) <= granted:
-        raise ToolFailure("De nouvelles autorisations Google sont nécessaires (Drive, Tâches, YouTube…). "
-                          "Relancer une fois : python -m jarvis --connecter-google")
-    creds = Credentials.from_authorized_user_file(str(token_path()), SCOPES)
+    youtube = api == "youtube"
+    scopes = YOUTUBE_SCOPES if youtube else SCOPES
+    what = "YouTube" if youtube else "Google"
+    if not is_connected(youtube):
+        raise ToolFailure(f"{what} n'est pas connecté. Lancer : python -m jarvis --connecter-google")
+    path = token_path(youtube)
+    granted = set(json.loads(path.read_text(encoding="utf-8")).get("scopes") or scopes)
+    if not set(scopes) <= granted:
+        raise ToolFailure(f"Il manque des autorisations {what} (toutes les cases n'ont pas été cochées, ou "
+                          "Jarvis a été mis à jour). Relancer une fois : python -m jarvis --connecter-google")
+    creds = Credentials.from_authorized_user_file(str(path), scopes)
     if not creds.valid:
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())
-            token_path().write_text(creds.to_json(), encoding="utf-8")
+            path.write_text(creds.to_json(), encoding="utf-8")
         else:
-            raise ToolFailure("Autorisation Google expirée. Relancer : python -m jarvis --connecter-google")
+            raise ToolFailure(f"Autorisation {what} expirée. Relancer : python -m jarvis --connecter-google")
     return build(api, version, credentials=creds, cache_discovery=False)
 
 

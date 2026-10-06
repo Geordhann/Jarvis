@@ -151,6 +151,8 @@ Jarvis peut alors utiliser toute ta suite Google :
 - **Contacts** : retrouver l'adresse ou le numéro de quelqu'un ;
 - **YouTube** : tes playlists et abonnements (« Jarvis, mets ma playlist sport »).
 
+La connexion ouvre **deux pages** l'une après l'autre : la suite Google, puis YouTube (Google interdit de
+les autoriser ensemble). Coche toutes les cases à chaque fois.
 Si Jarvis te dit qu'il manque des autorisations (après une mise à jour), relance simplement
 `python -m jarvis --connecter-google`.
 **Il annonce toujours un envoi ou un rendez-vous et attend ton « oui » avant de le faire.**
