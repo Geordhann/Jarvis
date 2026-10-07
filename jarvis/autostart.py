@@ -77,6 +77,8 @@ def uninstall() -> Path | None:
 # --- icône sur le Bureau et dans le menu Démarrer --------------------------
 
 _PS_SHORTCUT = r"""
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
 $shell = New-Object -ComObject WScript.Shell
 $places = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs'))
 foreach ($dir in $places) {
@@ -117,7 +119,10 @@ def create_shortcuts() -> list[str]:
         env = {**os.environ, "JARVIS_EXE": python, "JARVIS_ARGS": " ".join(ARGS),
                "JARVIS_DIR": str(PROJECT_DIR), "JARVIS_ICON": icon or ""}
         out = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", _PS_SHORTCUT],
-                             env=env, capture_output=True, text=True, check=True)
+                             env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if out.returncode != 0:
+            raise RuntimeError((out.stderr or out.stdout).strip()[-400:] +
+                               "\nAstuce : double-clique sur LANCER-JARVIS.vbs, il ajoute l'icône tout seul.")
         return [line for line in out.stdout.splitlines() if line.strip()]
     if sys.platform == "darwin":
         target = Path.home() / "Desktop" / "Jarvis.command"

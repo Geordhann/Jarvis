@@ -52,7 +52,7 @@ echo [5/5] Configuration
 echo.
 choice /c ON /n /m "Lancer Jarvis maintenant ? [O/N] "
 if errorlevel 2 goto fin
-start "" ".venv\Scripts\pythonw.exe" -m jarvis --fond
+wscript "%~dp0LANCER-JARVIS.vbs"
 echo  Jarvis demarre (la boule apparait dans quelques secondes).
 goto fin
 

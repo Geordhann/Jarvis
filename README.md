@@ -41,6 +41,9 @@ clé Claude, haut-parleurs (avec test du son), micro, voix et effet, personnalit
 icône sur le Bureau et lancement au démarrage. Il faut Python (https://www.python.org/downloads/,
 case « Add python.exe to PATH » cochée).
 
+Pour lancer Jarvis : l'icône **Jarvis** du Bureau, ou **`LANCER-JARVIS.vbs`** dans le dossier
+(il remet l'icône sur le Bureau si elle n'y est pas).
+
 ### À la main (Windows, macOS, Linux)
 Il faut Python 3.10 ou plus récent.
 
