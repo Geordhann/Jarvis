@@ -48,6 +48,9 @@ EFFECT_RE = re.compile(r"\b(?:effet|mode|voix (?:de )?)\s*(droide|tactique|robot
 EFFECT_OFF_RE = re.compile(r"\b(enleve|retire|coupe|supprime) l'effet\b|\bvoix normale\b|\bsans effet\b")
 SPEED_RE = re.compile(r"\bparle (plus )?(vite|rapidement|lentement|doucement|moins vite)\b")
 PITCH_RE = re.compile(r"\bvoix (plus )?(grave|aigue|basse|haute)\b")
+INTRO_MUSIC_RE = re.compile(r"\b(musique d'entree|ta musique|entree en scene|thunderstruck|mode iron man)\b")
+SENSITIVITY_RE = re.compile(r"\b(plus|moins) sensible\b|\b(augmente|monte|baisse|diminue) (?:la )?sensibilite\b")
+VOICE_DEMO_RE = re.compile(r"\b(fais(?:-moi)? (?:ecouter|entendre)|presente(?:-moi)?|teste|essaie) (?:les |tes )?voix\b")
 ANNOUNCE_ON_RE = re.compile(r"\b(active|reactive|remets) les annonces\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
 
@@ -88,7 +91,8 @@ class Jarvis:
         if not self.voice.muted:
             announcer.start(self.voice.say)
         reminders.on_due(self.voice.say)
-        if not self.voice.muted and startup_music.play():
+        # Musique d'entrée seulement si l'utilisateur l'a activée (--musique-au-lancement oui).
+        if not self.voice.muted and config.get("musique_au_lancement") == "oui" and startup_music.play():
             time.sleep(4)  # quelques secondes d'intro avant de saluer
         self.voice.say(f"Bonjour {self.title}. Tous les systèmes sont opérationnels.")
         self.voice.wait()
@@ -159,6 +163,24 @@ class Jarvis:
             sessions.reset("voix")
             self.voice.say("C'est oublié. On repart de zéro.")
             return True
+        if VOICE_DEMO_RE.search(plain):
+            self.voice_demo()
+            return True
+        if INTRO_MUSIC_RE.search(plain) and not re.search(r"\b(coupe|arrete|stop)", plain):
+            if not startup_music.play():
+                self.voice.say("Je ne trouve pas le fichier de la musique d'entrée dans votre dossier Musique.")
+            return True
+        sens = SENSITIVITY_RE.search(plain)
+        if sens:
+            up = (sens.group(1) or sens.group(2)) in ("plus", "augmente", "monte")
+            from .ears import sensitivity
+
+            level = max(1, min(10, sensitivity() + (1 if up else -1)))
+            config.save("sensibilite_micro", str(level))
+            if self.ears is not None:
+                self.ears.apply_sensitivity()
+            self.voice.say(f"Sensibilité du micro réglée sur {level} sur 10.")
+            return True
         speed, tone = SPEED_RE.search(plain), PITCH_RE.search(plain)
         if speed or tone:
             key, step, word = (("vitesse_voix", 10, speed.group(2)) if speed else ("hauteur_voix", 15, tone.group(2)))
@@ -212,6 +234,19 @@ class Jarvis:
                            f"Dites par exemple : Jarvis, prends la voix de {voices.default_voice()}.")
             return True
         return False
+
+    def voice_demo(self) -> None:
+        """Fait entendre chaque voix ; on garde celle qu'on veut avec « prends la voix de … »."""
+        current = self.voice.voice
+        names = list(voices.catalog())
+        self.voice.say(f"Voici mes {len(names)} voix. Dites ensuite : prends la voix de, suivi du prénom.")
+        self.voice.wait()
+        for name in names:
+            self.voice.voice = name
+            self.voice.say(f"Je suis {name}.")
+            self.voice.wait()
+        self.voice.voice = current
+        self.voice.say("C'était la dernière. Laquelle voulez-vous ?")
 
     def _handle_media(self, request: str, plain: str) -> bool:
         clean = plain.strip(" .!?")
@@ -357,6 +392,10 @@ def main() -> None:
     run.add_argument("--voix", default=None, help="voix pour cette session (Daniel, Henri, Denise…)")
     run.add_argument("--effet", choices=["aucun", "ia", "droide", "tactique", "robot"],
                      help="effet sur la voix, sans Voicemod (mémorisé)")
+    run.add_argument("--musique-au-lancement", choices=["oui", "non"],
+                     help="jouer la musique d'entrée à chaque lancement (désactivé par défaut, mémorisé)")
+    run.add_argument("--sensibilite-micro", metavar="1-10", help="sensibilité du micro, 10 = capte un murmure (mémorisé)")
+    run.add_argument("--tester-micro", action="store_true", help="tester ce que Jarvis comprend au micro")
     run.add_argument("--musique-demarrage", metavar="CHEMIN",
                      help="musique jouée au lancement (fichier MP3) ; « non » pour la désactiver (mémorisé)")
     run.add_argument("--volume-fond", metavar="POURCENT",
@@ -385,13 +424,15 @@ def main() -> None:
                       ("dossier_musique", "dossier_musique"),
                       ("sortie_audio", "sortie_audio"), ("micro", "micro"), ("modele", "modele"), ("effort", "effort"), ("effet", "effet"),
                       ("vitesse_voix", "vitesse_voix"), ("hauteur_voix", "hauteur_voix"),
-                      ("musique_demarrage", "musique_demarrage"), ("volume_fond", "musique_volume_fond")):
+                      ("musique_demarrage", "musique_demarrage"), ("volume_fond", "musique_volume_fond"),
+                      ("musique_au_lancement", "musique_au_lancement"), ("sensibilite_micro", "sensibilite_micro")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
             print(f"Réglage « {key} » enregistré.")
             one_shot = one_shot or flag not in ("modele", "effort", "effet", "vitesse_voix", "hauteur_voix",
-                                                 "musique_demarrage", "volume_fond")
+                                                 "musique_demarrage", "volume_fond", "musique_au_lancement",
+                                                 "sensibilite_micro")
     for key in ("sortie_audio", "micro"):
         if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
             config.save(key, None)
@@ -442,6 +483,10 @@ def main() -> None:
         from .audio_devices import print_devices
 
         return print_devices()
+    if args.tester_micro:
+        from .ears import test_microphone
+
+        return test_microphone()
     if args.essayer_effets:
         return try_effects(args.muet)
     if args.liste_voix:

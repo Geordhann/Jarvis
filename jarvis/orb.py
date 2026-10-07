@@ -270,6 +270,8 @@ def run(on_quit=None) -> None:
 
             if startup_music.is_playing():
                 menu.addAction("Couper la musique", lambda *_: startup_music.stop())
+            else:
+                menu.addAction("Jouer la musique d'entrée", lambda *_: startup_music.play())
             menu.addAction("Masquer (Ctrl+Alt+J pour revenir)", lambda *_: self.hide())
             menu.addAction("Ouvrir l'interface complète", lambda *_: self.open_interface())
             menu.addSeparator()

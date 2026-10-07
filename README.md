@@ -229,7 +229,8 @@ python -m jarvis --vitesse-voix -10    # de -50 (lent) à 50 (rapide)
 python -m jarvis --hauteur-voix -20    # de -50 (grave) à 50 (aigu)
 python -m jarvis --essayer-effets      # + un effet : ia, droide, tactique, robot
 ```
-À la voix : « Jarvis, parle plus lentement », « Jarvis, voix plus grave », « Jarvis, prends la voix de Bryan ».
+À la voix : « Jarvis, présente-moi tes voix » (chaque voix se présente), puis « Jarvis, prends la voix
+de Bryan » ; « Jarvis, parle plus lentement », « Jarvis, voix plus grave ».
 
 ### SMS (téléphone Android)
 Jarvis envoie les SMS **depuis ton propre numéro**, gratuitement (compris dans ton forfait), grâce à
@@ -292,16 +293,25 @@ il réfléchit et pulse quand il parle, avec ses phrases en sous-titre.
   normale* ou *Toujours au premier plan*. Aussi : *Masquer*, *Quitter*.
 - **Ctrl+Alt+J** n'importe où : afficher / masquer. Ou à la voix : « Jarvis, cache-toi » / « Jarvis, montre-toi ».
 
-### Musique d'entrée (Thunderstruck)
-Au lancement, Jarvis joue **Thunderstruck** à plein volume, puis la musique baisse progressivement
-jusqu'à un fond sonore, et s'efface quand Jarvis parle. Le morceau n'est pas fourni (droits d'auteur) :
-mets ton MP3 de Thunderstruck dans ton dossier **Musique** (Jarvis le trouve tout seul), ou :
+### Musique d'entrée (Thunderstruck), en option
+C'est **toi qui décides** : dis « Jarvis, mets ta musique d'entrée » (ou « mode Iron Man »), ou clic droit
+sur la boule → *Jouer la musique d'entrée*. Le morceau démarre fort, puis baisse progressivement jusqu'à un
+fond sonore, et s'efface quand Jarvis parle. « Jarvis, coupe la musique » pour l'arrêter.
+Le morceau n'est pas fourni (droits d'auteur) : mets ton MP3 de Thunderstruck dans ton dossier **Musique**.
 ```powershell
-python -m jarvis --musique-demarrage "C:\chemin\vers\Thunderstruck.mp3"   # ou un autre morceau
-python -m jarvis --volume-fond 10        # volume une fois en fond (défaut 15 %)
-python -m jarvis --musique-demarrage non # désactiver
+python -m jarvis --musique-au-lancement oui   # la jouer aussi à chaque lancement (désactivé par défaut)
+python -m jarvis --musique-demarrage "C:\chemin\vers\morceau.mp3"   # un autre morceau
+python -m jarvis --volume-fond 10             # volume une fois en fond (défaut 15 %)
 ```
-Pour la couper : « Jarvis, coupe la musique », ou clic droit sur la boule → *Couper la musique*.
+
+### Micro : mieux te capter
+```powershell
+python -m jarvis --tester-micro          # affiche ce que Jarvis comprend, phrase par phrase
+python -m jarvis --sensibilite-micro 8   # de 1 (voix forte seulement) à 10 (capte un murmure), défaut 7
+```
+À la voix : « Jarvis, sois plus sensible » / « sois moins sensible ». Trop sensible, il risque de se
+déclencher sur les bruits de la pièce ; pas assez, il rate le début des phrases.
+Pense aussi au volume du micro dans Windows : *Paramètres → Son → ton micro → Volume d'entrée* (vers 80-100).
 
 ### Démarrage automatique
 ```bash
@@ -383,7 +393,8 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--voix NOM`, `--choisir-voix`, `--liste-voix` | voix |
 | `--liste-audio`, `--sortie-audio NOM`, `--micro NOM` | choisir haut-parleur et micro (Voicemod) |
 | `--orbe`, `--sans-orbe` | boule animée sur l'écran (mémorisé) |
-| `--musique-demarrage CHEMIN`, `--volume-fond POURCENT` | musique d'entrée (Thunderstruck…), « non » pour la retirer |
+| `--musique-au-lancement oui/non`, `--musique-demarrage CHEMIN`, `--volume-fond POURCENT` | musique d'entrée (Thunderstruck…) |
+| `--tester-micro`, `--sensibilite-micro 1-10` | régler l'écoute du micro |
 | `--interface`, `--sans-micro`, `--texte`, `--muet`, `--toujours` | façons de l'utiliser |
 | `--installer` | tout installer : icône Bureau + menu Démarrer, boule, lancement au démarrage |
 | `--raccourcis` | recréer seulement l'icône |
