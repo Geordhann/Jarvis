@@ -44,8 +44,11 @@ PLAY_RE = re.compile(r"^(?:mets|lance|joue)(?:-moi)?\s+(?:de la |la |une |un )?"
 ANNOUNCE_OFF_RE = re.compile(r"\b(arrete|stoppe|desactive|coupe) les annonces\b")
 ORB_HIDE_RE = re.compile(r"\b(cache[- ]toi|masque[- ]toi|cache la boule|masque la boule|disparais)\b")
 ORB_SHOW_RE = re.compile(r"\b(montre[- ]toi|affiche[- ]toi|affiche la boule|montre la boule|apparais)\b")
-EFFECT_RE = re.compile(r"\b(?:effet|mode|voix (?:de )?)\s*(droide|tactique|robot|ia)\b")
-EFFECT_OFF_RE = re.compile(r"\b(enleve|retire|coupe|supprime) l'effet\b|\bvoix normale\b|\bsans effet\b")
+EFFECT_RE = re.compile(r"\b(?:effet|mode|voix|intonation|ton)(?: de| d')?\s*(droide tactique|tactique|droide|robot|ia)\b")
+EFFECT_OFF_RE = re.compile(r"\b(enleve|retire|coupe|supprime) (l'effet|l'intonation)\b|\bvoix normale\b|\bsans effet\b"
+                           r"|\bintonation normale\b")
+EFFECT_DEMO_RE = re.compile(r"\b(fais(?:-moi)? (?:ecouter|entendre)|presente(?:-moi)?|teste|essaie) "
+                            r"(?:les |tes )?(effets|intonations)\b")
 SPEED_RE = re.compile(r"\bparle (plus )?(vite|rapidement|lentement|doucement|moins vite)\b")
 PITCH_RE = re.compile(r"\bvoix (plus )?(grave|aigue|basse|haute)\b")
 INTRO_MUSIC_RE = re.compile(r"\b(musique d'entree|ta musique|entree en scene|thunderstruck|mode iron man)\b")
@@ -190,9 +193,13 @@ class Jarvis:
             config.save(key, str(value))
             self.voice.say("Comme ceci ?")
             return True
+        if EFFECT_DEMO_RE.search(plain):
+            self.effect_demo()
+            return True
         effect = EFFECT_RE.search(plain)
         if effect or EFFECT_OFF_RE.search(plain):
-            config.save("effet", effect.group(1) if effect else "aucun")
+            name = effect.group(1).replace("droide tactique", "tactique") if effect else "aucun"
+            config.save("effet", name)
             self.voice.say("Effet activé. Comment me trouvez-vous ?" if effect else "Voix normale rétablie.")
             return True
         if self._handle_voice(request, plain) or self._handle_media(request, plain):
@@ -234,6 +241,19 @@ class Jarvis:
                            f"Dites par exemple : Jarvis, prends la voix de {voices.default_voice()}.")
             return True
         return False
+
+    def effect_demo(self) -> None:
+        """Fait entendre chaque intonation (aucune, IA, droïde, droïde tactique, robot)."""
+        from . import effects
+
+        labels = {"aucun": "normale", "ia": "IA", "droide": "droïde", "tactique": "droïde tactique", "robot": "robot"}
+        current = config.get("effet") or "aucun"
+        for name in effects.PRESETS:
+            config.save("effet", name)
+            self.voice.say(f"Intonation {labels[name]}. Tous les systèmes sont opérationnels.")
+            self.voice.wait()
+        config.save("effet", current)
+        self.voice.say("Dites par exemple : Jarvis, mode droïde tactique.")
 
     def voice_demo(self) -> None:
         """Fait entendre chaque voix ; on garde celle qu'on veut avec « prends la voix de … »."""

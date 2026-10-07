@@ -89,7 +89,8 @@ Tu peux aussi utiliser une de tes voix ElevenLabs perso : `python -m jarvis --vo
 python -m jarvis --essayer-effets     # écoute chaque effet et garde ton préféré
 python -m jarvis --effet tactique     # ou directement : aucun, ia, droide, tactique, robot
 ```
-Ou à la voix : « Jarvis, mets l'effet droïde », « Jarvis, mode tactique », « Jarvis, voix normale ».
+Ou à la voix : « Jarvis, présente-moi tes intonations » (il les fait toutes entendre), puis
+« Jarvis, mode droïde tactique », « intonation robot », « effet IA », « mode droïde », « voix normale ».
 
 | Effet | Rendu |
 |---|---|
