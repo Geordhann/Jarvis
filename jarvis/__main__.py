@@ -411,6 +411,8 @@ def main() -> None:
     run.add_argument("--muet", action="store_true", help="ne pas lire les réponses à voix haute")
     run.add_argument("--toujours", action="store_true", help="répondre sans attendre « Jarvis »")
     run.add_argument("--voix", default=None, help="voix pour cette session (Daniel, Henri, Denise…)")
+    run.add_argument("--enregistrer-voicemod", action="store_true",
+                     help="enregistrer la même phrase avec et sans Voicemod, pour régler l'effet perso")
     run.add_argument("--effet-perso", metavar="POWERPITCH,ROBOT,HAUTEUR",
                      help="réglages de l'effet perso, comme les boutons Voicemod, ex. 73,100,13 (mémorisé)")
     run.add_argument("--effet", choices=["aucun", "ia", "droide", "tactique", "robot", "perso"],
@@ -507,6 +509,10 @@ def main() -> None:
         from .audio_devices import print_devices
 
         return print_devices()
+    if args.enregistrer_voicemod:
+        from .calibration import record_pair
+
+        return record_pair()
     if args.tester_micro:
         from .ears import test_microphone
 
