@@ -1,7 +1,8 @@
 """La boule de Jarvis : un réacteur animé qui flotte sur l'écran (style Iron Man).
 
 - Glisser avec la souris pour la déplacer (la position est mémorisée).
-- Clic : Jarvis t'écoute sans que tu dises « Jarvis ».
+- Clic : Jarvis t'écoute sans que tu dises « Jarvis » (ou se tait s'il parle).
+- Ctrl+Alt+S (partout dans Windows) : faire taire Jarvis.
 - Double-clic : ouvre l'interface complète.
 - Clic droit : position (derrière les fenêtres, normale, premier plan), masquer, quitter.
 - Ctrl+Alt+J (partout dans Windows) : afficher / masquer.
@@ -19,6 +20,7 @@ from . import config, state
 SIZE = 240          # diamètre de la zone de la boule
 CAPTION_H = 70      # hauteur de la zone de sous-titres
 HOTKEY = "<ctrl>+<alt>+j"
+STOP_HOTKEY = "<ctrl>+<alt>+s"   # faire taire Jarvis
 
 COLORS = {
     state.IDLE: (79, 214, 255),
@@ -245,6 +247,8 @@ def run(on_quit=None) -> None:
             if event.button() == Qt.LeftButton:
                 if self.moved:
                     config.save("orbe_position", f"{self.x()},{self.y()}")
+                elif state.get()[0] == state.SPEAKING:
+                    state.request_stop()  # clic pendant qu'il parle : il se tait
                 else:
                     state.wake()  # clic simple : « je t'écoute »
                 self.drag_from = None
@@ -327,7 +331,8 @@ def _start_hotkey() -> None:
     try:
         from pynput import keyboard
 
-        listener = keyboard.GlobalHotKeys({HOTKEY: lambda: state.request_visibility("basculer")})
+        listener = keyboard.GlobalHotKeys({HOTKEY: lambda: state.request_visibility("basculer"),
+                                           STOP_HOTKEY: state.request_stop})
         listener.daemon = True
         listener.start()
     except Exception as exc:

@@ -39,8 +39,8 @@ CHANNELS = {
 }
 
 SYSTEM_PROMPT = """Tu es JARVIS, l'assistant personnel de ton utilisateur, inspiré du majordome IA d'Iron Man.
-Tu parles français, avec un ton poli, posé, légèrement pince-sans-rire. Tu es efficace : tu agis
-au lieu de demander quand l'intention est claire, et tu vas droit au but.
+Tu parles français. {personality} Tu es efficace : tu agis au lieu de demander quand
+l'intention est claire, et tu vas droit au but.
 
 # Ce que tu sais de ton utilisateur
 Voici le profil qu'il a écrit lui-même. Suis ses préférences.
@@ -96,6 +96,10 @@ def french_time(t: datetime.datetime) -> str:
     return f"{t.hour} h {t.minute:02d}"
 
 
+class Interrupted(Exception):
+    """Levée par on_sentence quand l'utilisateur coupe Jarvis : on arrête de générer (et de payer)."""
+
+
 class SentenceSplitter:
     """Découpe le texte reçu en phrases pour les lire dès qu'elles sont complètes."""
 
@@ -146,7 +150,10 @@ class Agent:
             else "Les SMS ne sont pas configurés : si on te le demande, explique qu'il faut lancer "
                  "« python -m jarvis --configurer-sms »."
         ) + " Tu ne peux pas lire ses SMS reçus ni ses conversations WhatsApp ou Telegram."
+        from . import personalities
+
         self.system = SYSTEM_PROMPT.format(
+            personality=personalities.instructions(),
             messages_note=messages_note,
             profile=profile.read() or "(profil vide)",
             skills=skills.catalog(self.skills) or "(aucune)",
@@ -196,6 +203,14 @@ class Agent:
             return self._ask(text, on_sentence or (lambda s: None), on_tool or (lambda n: None))
 
     def _ask(self, text: str, on_sentence, on_tool) -> str:
+        start = len(self.messages)
+        try:
+            return self._ask_inner(text, on_sentence, on_tool)
+        except Interrupted:
+            del self.messages[start:]  # tour abandonné : la conversation reste valide
+            return ""
+
+    def _ask_inner(self, text: str, on_sentence, on_tool) -> str:
         ready = repliques.find(text)
         if ready:  # réplique prête : instantané, sans appeler Claude
             on_sentence(ready)

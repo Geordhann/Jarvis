@@ -1,0 +1,5 @@
+# Écoute 100 % locale (optionnel, ~300 Mo) : pip install -r requirements-local.txt
+# Reconnaissance vocale Whisper sur le PC (--reconnaissance whisper)
+faster-whisper
+# Mot d'éveil « Hey Jarvis » détecté sur le PC (--eveil-local oui)
+openwakeword

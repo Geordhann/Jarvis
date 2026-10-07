@@ -54,3 +54,19 @@ def take_visibility_request() -> str | None:
     with _lock:
         action, _visibility_request = _visibility_request, None
         return action
+
+
+# --- Interruption : « Jarvis, stop », clic sur la boule pendant qu'il parle, Ctrl+Alt+S -------------
+_stop_listeners: list = []
+
+
+def on_stop(callback) -> None:
+    _stop_listeners.append(callback)
+
+
+def request_stop() -> None:
+    for callback in list(_stop_listeners):
+        try:
+            callback()
+        except Exception as exc:
+            print(f"[stop] erreur : {exc}")

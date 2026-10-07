@@ -17,16 +17,43 @@ class Voice:
     def __init__(self, voice: str | None = None, muted: bool = False):
         self.voice = voice  # prénom ou identifiant ; None = voix enregistrée / par défaut
         self.muted = muted
-        self._texts: queue.Queue[str] = queue.Queue()
-        self._audio: queue.Queue[tuple[str, bytes | None, str]] = queue.Queue()
+        self._texts: queue.Queue[tuple[int, str]] = queue.Queue()
+        self._audio: queue.Queue[tuple[int, str, bytes | None, str]] = queue.Queue()
+        # Chaque interruption change de « génération » : tout ce qui est plus ancien est jeté.
+        self._generation = 0
+        self.stopped = False
         self._engine = None
         threading.Thread(target=self._synth_loop, daemon=True).start()
         threading.Thread(target=self._play_loop, daemon=True).start()
 
     def say(self, text: str) -> None:
+        if self.stopped:
+            return  # interrompu : on ignore la suite de la réponse
         print(f"JARVIS › {text}", flush=True)
         if not self.muted:
-            self._texts.put(text)
+            self._texts.put((self._generation, text))
+
+    def stop(self) -> None:
+        """Coupe la parole immédiatement et jette les phrases en attente."""
+        self.stopped = True
+        self._generation += 1
+        try:
+            import pygame
+
+            if pygame.mixer.get_init():
+                pygame.mixer.music.stop()
+        except Exception:
+            pass
+        if self._engine is not None:
+            try:
+                self._engine.stop()
+            except Exception:
+                pass
+        state.set(state.IDLE)
+
+    def resume(self) -> None:
+        """À appeler avant une nouvelle demande : Jarvis peut de nouveau parler."""
+        self.stopped = False
 
     def wait(self) -> None:
         """Bloque jusqu'à ce que tout ce qui est en file ait été prononcé."""
@@ -35,18 +62,24 @@ class Voice:
 
     def _synth_loop(self) -> None:
         while True:
-            text = self._texts.get()
+            generation, text = self._texts.get()
+            if generation != self._generation:
+                self._texts.task_done()
+                continue
             try:
                 audio, ext = effects.apply(tts.synthesize(text, self.voice))
             except Exception as exc:
                 print(f"[voix] synthèse impossible ({exc}), voix hors-ligne.")
                 audio, ext = None, "mp3"
-            self._audio.put((text, audio, ext))
+            self._audio.put((generation, text, audio, ext))
             self._texts.task_done()
 
     def _play_loop(self) -> None:
         while True:
-            text, audio, ext = self._audio.get()
+            generation, text, audio, ext = self._audio.get()
+            if generation != self._generation:
+                self._audio.task_done()
+                continue
             state.set(state.SPEAKING, text)
             try:
                 if audio:
@@ -72,8 +105,9 @@ class Voice:
                 f.write(audio)
             pygame.mixer.music.load(path)
             pygame.mixer.music.play()
-            while pygame.mixer.music.get_busy():
-                pygame.time.wait(50)
+            while pygame.mixer.music.get_busy() and not self.stopped:
+                pygame.time.wait(30)
+            pygame.mixer.music.stop()
             pygame.mixer.music.unload()
         finally:
             os.remove(path)
