@@ -78,9 +78,10 @@ def play(name: str) -> None:
     if not enabled():
         return
     try:
-        from .audio_out import ensure_mixer
+        from .audio_out import MIXER_LOCK, ensure_mixer
 
         ensure_mixer()
-        _sound(name).play()
+        with MIXER_LOCK:
+            _sound(name).play()
     except Exception as exc:
         print(f"[bruitage] « {name} » impossible : {exc}")

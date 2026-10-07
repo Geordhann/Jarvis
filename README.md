@@ -295,17 +295,6 @@ Le premier lancement télécharge les modèles (une seule fois).
 - Personnalités : « Jarvis, **mode sarcastique** » (le JARVIS des films, en plus mordant), « mode sérieux »,
   « mode motivant », « mode drôle », « mode majordome », « mode classique ».
 
-### Depuis ton téléphone (partout, en privé)
-1. Installe **Tailscale** (gratuit) sur le PC et sur le téléphone : <https://tailscale.com/download>,
-   connecte-toi avec le **même compte** sur les deux.
-2. Sur le PC : `python -m jarvis --configurer-mobile` → il affiche l'adresse (`https://ton-pc….ts.net`)
-   et un **code d'accès**. (Si Tailscale affiche un lien pour activer HTTPS/Serve, ouvre-le puis relance.)
-3. Sur le téléphone, ouvre l'adresse dans Chrome, tape le code, puis menu ⋮ → **Ajouter à l'écran d'accueil**.
-
-L'interface n'est visible que par tes appareils Tailscale (jamais sur Internet), en HTTPS, avec code
-d'accès (5 erreurs = blocage 10 minutes). Le PC doit être allumé avec Jarvis lancé.
-Changer le code : `python -m jarvis --nouveau-code-mobile`.
-
 ## 3. Utilisation
 
 ```bash
@@ -453,7 +442,6 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--interface`, `--sans-micro`, `--texte`, `--muet`, `--toujours` | façons de l'utiliser |
 | `--reconnaissance google/whisper`, `--whisper-modele`, `--eveil-local oui/non`, `--seuil-eveil` | écoute locale |
 | `--interruption oui/non`, `--bruitages oui/non`, `--personnalite NOM` | comportement |
-| `--configurer-mobile`, `--nouveau-code-mobile` | accès depuis le téléphone |
 | `--installer` | tout installer : icône Bureau + menu Démarrer, boule, lancement au démarrage |
 | `--raccourcis` | recréer seulement l'icône |
 | `--installer-demarrage`, `--retirer-demarrage` | lancement automatique |

@@ -6,6 +6,7 @@ import os
 import queue
 import tempfile
 import threading
+import time
 
 from . import effects, state, tts
 
@@ -35,20 +36,10 @@ class Voice:
 
     def stop(self) -> None:
         """Coupe la parole immédiatement et jette les phrases en attente."""
+        # Appelé depuis d'autres threads (boule, raccourci, écoute) : on ne touche pas au son ici,
+        # c'est le thread de lecture qui voit « stopped » et coupe (pygame n'aime pas le multi-thread).
         self.stopped = True
         self._generation += 1
-        try:
-            import pygame
-
-            if pygame.mixer.get_init():
-                pygame.mixer.music.stop()
-        except Exception:
-            pass
-        if self._engine is not None:
-            try:
-                self._engine.stop()
-            except Exception:
-                pass
         state.set(state.IDLE)
 
     def resume(self) -> None:
@@ -77,7 +68,7 @@ class Voice:
     def _play_loop(self) -> None:
         while True:
             generation, text, audio, ext = self._audio.get()
-            if generation != self._generation:
+            if generation != self._generation or self.stopped:
                 self._audio.task_done()
                 continue
             state.set(state.SPEAKING, text)
@@ -96,19 +87,24 @@ class Voice:
     def _play(self, audio: bytes, ext: str = "mp3") -> None:
         import pygame
 
-        from .audio_out import ensure_mixer
+        from .audio_out import MIXER_LOCK, ensure_mixer
 
         ensure_mixer()  # sortie son partagée avec la musique de démarrage
         fd, path = tempfile.mkstemp(suffix=f".{ext}")
         try:
             with os.fdopen(fd, "wb") as f:
                 f.write(audio)
-            pygame.mixer.music.load(path)
-            pygame.mixer.music.play()
-            while pygame.mixer.music.get_busy() and not self.stopped:
-                pygame.time.wait(30)
-            pygame.mixer.music.stop()
-            pygame.mixer.music.unload()
+            with MIXER_LOCK:
+                pygame.mixer.music.load(path)
+                pygame.mixer.music.play()
+            while not self.stopped:
+                with MIXER_LOCK:
+                    if not pygame.mixer.music.get_busy():
+                        break
+                time.sleep(0.03)
+            with MIXER_LOCK:
+                pygame.mixer.music.stop()
+                pygame.mixer.music.unload()
         finally:
             os.remove(path)
 

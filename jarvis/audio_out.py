@@ -6,6 +6,9 @@ import threading
 
 _lock = threading.Lock()
 _ready = False
+# À prendre autour de chaque appel pygame.mixer : la voix, les bruitages et la musique
+# jouent depuis des threads différents.
+MIXER_LOCK = threading.RLock()
 
 
 def ensure_mixer() -> None:
@@ -19,6 +22,7 @@ def ensure_mixer() -> None:
         from .audio_devices import output_device
 
         device = output_device()
-        pygame.mixer.init(devicename=device) if device else pygame.mixer.init()
-        pygame.mixer.set_num_channels(8)
+        with MIXER_LOCK:
+            pygame.mixer.init(devicename=device) if device else pygame.mixer.init()
+            pygame.mixer.set_num_channels(8)
         _ready = True

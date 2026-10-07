@@ -6,6 +6,8 @@ python -m jarvis --sensibilite-micro 8, ou « Jarvis, sois plus sensible ».
 
 from __future__ import annotations
 
+import threading
+
 from . import config
 
 DEFAULT_SENSITIVITY = 7
@@ -16,6 +18,12 @@ def sensitivity() -> int:
         return max(1, min(10, int(config.get("sensibilite_micro") or DEFAULT_SENSITIVITY)))
     except ValueError:
         return DEFAULT_SENSITIVITY
+
+
+# Un seul accès au micro à la fois : sous Windows, deux flux PortAudio ouverts/fermés en même temps
+# depuis deux threads (écoute + interruption) font planter Python (erreur « mémoire ne peut pas être read »).
+MIC_LOCK = threading.RLock()
+_whisper_lock = threading.Lock()
 
 
 class Ears:
@@ -34,7 +42,7 @@ class Ears:
         self.recognizer.non_speaking_duration = 0.5
         self.recognizer.phrase_threshold = 0.2
         self.microphone = sr.Microphone(device_index=input_index())
-        with self.microphone as source:
+        with MIC_LOCK, self.microphone as source:
             print("Calibrage du micro, silence s'il vous plaît…")
             self.recognizer.adjust_for_ambient_noise(source, duration=1.5)
         self.ambient = self.recognizer.energy_threshold
@@ -71,7 +79,7 @@ class Ears:
         `timeout` : secondes d'attente maximum avant que quelqu'un commence à parler.
         """
         sr = self.sr
-        with self.microphone as source:
+        with MIC_LOCK, self.microphone as source:
             try:
                 audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_limit)
             except sr.WaitTimeoutError:
@@ -79,17 +87,18 @@ class Ears:
         return self.transcribe(audio)
 
     def listen_short(self) -> str | None:
-        """Écoute brève sur un second flux micro, pendant que Jarvis parle (pour l'interrompre)."""
+        """Écoute brève pendant que Jarvis parle (pour l'interrompre), si le micro est libre."""
         sr = self.sr
-        if not hasattr(self, "_second_mic"):
-            from .audio_devices import input_index
-
-            self._second_mic = sr.Microphone(device_index=input_index())
-        with self._second_mic as source:
-            try:
-                audio = self.recognizer.listen(source, timeout=1.5, phrase_time_limit=3)
-            except sr.WaitTimeoutError:
-                return None
+        if not MIC_LOCK.acquire(timeout=0.3):
+            return None  # le micro est déjà utilisé par l'écoute principale
+        try:
+            with self.microphone as source:
+                try:
+                    audio = self.recognizer.listen(source, timeout=1.5, phrase_time_limit=3)
+                except sr.WaitTimeoutError:
+                    return None
+        finally:
+            MIC_LOCK.release()
         return self.transcribe(audio)
 
     # --- mot d'éveil local (« Hey Jarvis ») ------------------------------------
@@ -103,8 +112,10 @@ class Ears:
         from . import sounds
 
         detector = wake_detector()
-        stream = self._wake_stream()
+        MIC_LOCK.acquire()
+        stream = None
         try:
+            stream = self._wake_stream()
             detector.reset()
             while True:
                 chunk = np.frombuffer(stream.read(WAKE_CHUNK, exception_on_overflow=False), dtype=np.int16)
@@ -115,8 +126,10 @@ class Ears:
             sounds.play("ecoute")
             frames = self._record_request(stream)
         finally:
-            stream.stop_stream()
-            stream.close()
+            if stream is not None:
+                stream.stop_stream()
+                stream.close()
+            MIC_LOCK.release()
         if not frames:
             return ""
         audio = self.sr.AudioData(b"".join(frames), WAKE_RATE, 2)
@@ -127,8 +140,11 @@ class Ears:
         import numpy as np
 
         detector = wake_detector()
-        stream = self._wake_stream()
+        if not MIC_LOCK.acquire(timeout=0.3):
+            return False
+        stream = None
         try:
+            stream = self._wake_stream()
             detector.reset()
             while condition():
                 chunk = np.frombuffer(stream.read(WAKE_CHUNK, exception_on_overflow=False), dtype=np.int16)
@@ -136,8 +152,10 @@ class Ears:
                     return True
             return False
         finally:
-            stream.stop_stream()
-            stream.close()
+            if stream is not None:
+                stream.stop_stream()
+                stream.close()
+            MIC_LOCK.release()
 
     def _wake_stream(self):
         import pyaudio
@@ -211,6 +229,11 @@ WHISPER_HALLUCINATIONS = ("sous-titres", "sous titres", "amara.org", "merci d'av
 
 def whisper_transcribe(audio) -> str | None:
     """Reconnaissance Whisper sur le PC : précise, sans Internet, la voix ne sort pas de chez toi."""
+    with _whisper_lock:  # un seul calcul Whisper à la fois
+        return _whisper_transcribe(audio)
+
+
+def _whisper_transcribe(audio) -> str | None:
     global _whisper
     import numpy as np
 

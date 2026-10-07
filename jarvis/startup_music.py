@@ -58,13 +58,14 @@ def play() -> bool:
     try:
         import pygame
 
-        from .audio_out import ensure_mixer
+        from .audio_out import MIXER_LOCK, ensure_mixer
 
         ensure_mixer()
-        sound = pygame.mixer.Sound(str(track))
-        _channel = pygame.mixer.find_channel(True)
-        _channel.set_volume(1.0)
-        _channel.play(sound)
+        with MIXER_LOCK:
+            sound = pygame.mixer.Sound(str(track))
+            _channel = pygame.mixer.find_channel(True)
+            _channel.set_volume(1.0)
+            _channel.play(sound)
     except Exception as exc:
         print(f"[musique] lecture impossible ({exc})")
         return False
@@ -73,8 +74,17 @@ def play() -> bool:
     return True
 
 
+def _mixer_lock():
+    from .audio_out import MIXER_LOCK
+
+    return MIXER_LOCK
+
+
 def is_playing() -> bool:
-    return _channel is not None and _channel.get_busy()
+    if _channel is None:
+        return False
+    with _mixer_lock():
+        return _channel.get_busy()
 
 
 def stop(fade_ms: int = 1500) -> bool:
@@ -82,7 +92,8 @@ def stop(fade_ms: int = 1500) -> bool:
     if not is_playing():
         return False
     _stop.set()
-    _channel.fadeout(fade_ms)
+    with _mixer_lock():
+        _channel.fadeout(fade_ms)
     return True
 
 
@@ -99,5 +110,6 @@ def _fade_loop() -> None:
         current, _, _ = state.get()
         if current == state.SPEAKING:
             volume = min(volume, DUCK_VOLUME)  # Jarvis parle : la musique s'efface
-        _channel.set_volume(volume)
+        with _mixer_lock():
+            _channel.set_volume(volume)
         time.sleep(0.05)
