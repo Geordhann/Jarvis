@@ -1,4 +1,5 @@
-"""Serveur de l'interface de Jarvis : http://localhost:8765 (accessible depuis ton ordinateur seulement)."""
+"""Serveur de l'interface de Jarvis : http://localhost:8765 sur le PC, et depuis le téléphone via Tailscale
+(adresse privée en HTTPS + code d'accès, voir mobile.py)."""
 
 from __future__ import annotations
 
@@ -6,7 +7,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from . import config, effects, sessions, state, tts, voices
+from . import config, effects, mobile, sessions, state, tts, voices
 from .tools import sms
 from .tools import google as google_tools
 
@@ -22,11 +23,20 @@ async def start():
     async def local_only(request: web.Request, handler):
         # Empêche un site web malveillant ouvert dans ton navigateur de piloter Jarvis :
         # nom d'hôte vérifié (DNS rebinding), en-tête maison obligatoire et origine contrôlée.
-        if request.host not in ALLOWED_HOSTS:
+        remote = mobile.is_remote(request)
+        # Depuis le téléphone : l'adresse Tailscale (ou localhost si le relais Tailscale la réécrit).
+        allowed = ({mobile.host()} | ALLOWED_HOSTS) if remote else ALLOWED_HOSTS
+        if request.host.split(":")[0] not in {h.split(":")[0] for h in allowed if h} and request.host not in allowed:
             return web.Response(status=403, text="Accès refusé")
+        if remote and request.path not in ("/connexion", "/manifest.json", "/icone.png") \
+                and not mobile.is_authorized(request):
+            if request.path.startswith("/api/"):
+                return web.Response(status=401, text="Code d'accès requis")
+            return web.Response(text=mobile.LOGIN_PAGE.replace("{message}", ""), content_type="text/html")
         if request.path.startswith("/api/"):
-            origin = request.headers.get("Origin")
-            if request.headers.get("X-Jarvis") != "1" or (origin and origin.split("://", 1)[-1] not in ALLOWED_HOSTS):
+            origin = (request.headers.get("Origin") or "").split("://", 1)[-1]
+            if request.headers.get("X-Jarvis") != "1" or (origin and origin not in allowed
+                                                            and origin.split(":")[0] != request.host.split(":")[0]):
                 return web.Response(status=403, text="Accès refusé")
         return await handler(request)
 
@@ -101,7 +111,31 @@ async def start():
         state.request_visibility("afficher")
         return web.json_response({"ok": True})
 
+    async def login(request: web.Request) -> web.Response:
+        form = await request.post()
+        if mobile.check_code(str(form.get("code", ""))):
+            response = web.HTTPFound("/")
+            response.set_cookie(mobile.COOKIE, mobile.code(), max_age=365 * 86400, httponly=True,
+                                secure=True, samesite="Strict")
+            return response
+        message = "Trop d'essais, réessaie dans 10 minutes." if mobile.locked_out() else "Code incorrect."
+        return web.Response(text=mobile.LOGIN_PAGE.replace("{message}", message), content_type="text/html",
+                            status=401)
+
+    async def manifest(request: web.Request) -> web.Response:
+        return web.json_response({
+            "name": "J.A.R.V.I.S.", "short_name": "Jarvis", "start_url": "/", "display": "standalone",
+            "background_color": "#04090f", "theme_color": "#04090f",
+            "icons": [{"src": "/icone.png", "sizes": "256x256", "type": "image/png"}],
+        })
+
+    async def icon(request: web.Request) -> web.Response:
+        return web.Response(body=_icon_png(), content_type="image/png")
+
     app = web.Application(middlewares=[local_only])
+    app.router.add_post("/connexion", login)
+    app.router.add_get("/manifest.json", manifest)
+    app.router.add_get("/icone.png", icon)
     app.router.add_post("/api/orbe/afficher", show_orb)
     app.router.add_get("/", index)
     app.router.add_post("/api/message", message)
@@ -114,3 +148,22 @@ async def start():
     await web.TCPSite(runner, "127.0.0.1", PORT).start()
     print(f"[interface] ouverte sur http://localhost:{PORT}")
     return runner
+
+
+def _icon_png() -> bytes:
+    """Icône du réacteur pour l'écran d'accueil du téléphone (dessinée avec Pillow)."""
+    import io
+
+    from PIL import Image, ImageDraw
+
+    size, cyan = 256, (79, 214, 255)
+    img = Image.new("RGB", (size, size), (4, 9, 15))
+    d = ImageDraw.Draw(img)
+    d.ellipse((8, 8, 248, 248), fill=(3, 10, 18), outline=cyan, width=4)
+    for i in range(8):
+        d.arc((28, 28, 228, 228), i * 45 + 6, i * 45 + 38, fill=cyan, width=14)
+    for r, c in ((60, (40, 120, 150)), (45, (79, 214, 255)), (25, (225, 250, 255))):
+        d.ellipse((128 - r, 128 - r, 128 + r, 128 + r), fill=c)
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue()

@@ -265,6 +265,47 @@ faire bannir ton compte). Jarvis passe donc par ton écran : « ouvre mes messag
 « regarde mon écran et résume mes messages », « réponds-lui que j'arrive » (il tape la réponse,
 c'est toi qui l'envoies).
 
+### Jeux Steam
+« Jarvis, lance Rocket League », « lance GTA 5 », « quels jeux j'ai ? » : Jarvis lit ta bibliothèque Steam
+(toutes tes bibliothèques) et comprend les noms approximatifs et les sigles.
+
+### Résumer ce qui est ouvert
+Avec une page ou une vidéo YouTube au premier plan : « Jarvis, résume cette vidéo », « de quoi parle cet
+article ? », « traduis cette page ». Il récupère le texte de la page ou les sous-titres de la vidéo.
+
+### Interrompre Jarvis
+Pendant qu'il parle : « **Jarvis, stop** » (ou « tais-toi », « chut »), **clic sur la boule**, ou
+**Ctrl+Alt+S**. Il se tait aussitôt, arrête de générer la réponse (tu ne la paies pas) et t'écoute.
+`python -m jarvis --interruption non` pour désactiver l'écoute pendant qu'il parle.
+
+### Écoute 100 % locale (optionnel, gratuit, privé)
+```powershell
+pip install -r requirements-local.txt          # ~300 Mo, une seule fois
+python -m jarvis --reconnaissance whisper       # Whisper : reconnaissance sur le PC, plus précise
+python -m jarvis --eveil-local oui              # « Hey Jarvis » détecté sur le PC
+```
+Avec le mot d'éveil local, rien n'est envoyé tant que tu n'as pas dit « **Hey Jarvis** » ; un bip te
+dit qu'il t'écoute, puis tu fais ta demande. Réglages : `--whisper-modele base` (plus rapide) ou `medium`
+(plus précis, PC puissant), `--seuil-eveil 0.3` (se réveille plus facilement) à `0.7` (plus strict).
+Le premier lancement télécharge les modèles (une seule fois).
+
+### Bruitages et personnalités
+- Bruitages Iron Man (démarrage du réacteur, bip d'écoute, bip « compris ») : « Jarvis, coupe les
+  bruitages » / « active les bruitages », ou `--bruitages non`.
+- Personnalités : « Jarvis, **mode sarcastique** » (le JARVIS des films, en plus mordant), « mode sérieux »,
+  « mode motivant », « mode drôle », « mode majordome », « mode classique ».
+
+### Depuis ton téléphone (partout, en privé)
+1. Installe **Tailscale** (gratuit) sur le PC et sur le téléphone : <https://tailscale.com/download>,
+   connecte-toi avec le **même compte** sur les deux.
+2. Sur le PC : `python -m jarvis --configurer-mobile` → il affiche l'adresse (`https://ton-pc….ts.net`)
+   et un **code d'accès**. (Si Tailscale affiche un lien pour activer HTTPS/Serve, ouvre-le puis relance.)
+3. Sur le téléphone, ouvre l'adresse dans Chrome, tape le code, puis menu ⋮ → **Ajouter à l'écran d'accueil**.
+
+L'interface n'est visible que par tes appareils Tailscale (jamais sur Internet), en HTTPS, avec code
+d'accès (5 erreurs = blocage 10 minutes). Le PC doit être allumé avec Jarvis lancé.
+Changer le code : `python -m jarvis --nouveau-code-mobile`.
+
 ## 3. Utilisation
 
 ```bash
@@ -410,6 +451,9 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--musique-au-lancement oui/non`, `--musique-demarrage CHEMIN`, `--volume-fond POURCENT` | musique d'entrée (Thunderstruck…) |
 | `--tester-micro`, `--sensibilite-micro 1-10` | régler l'écoute du micro |
 | `--interface`, `--sans-micro`, `--texte`, `--muet`, `--toujours` | façons de l'utiliser |
+| `--reconnaissance google/whisper`, `--whisper-modele`, `--eveil-local oui/non`, `--seuil-eveil` | écoute locale |
+| `--interruption oui/non`, `--bruitages oui/non`, `--personnalite NOM` | comportement |
+| `--configurer-mobile`, `--nouveau-code-mobile` | accès depuis le téléphone |
 | `--installer` | tout installer : icône Bureau + menu Démarrer, boule, lancement au démarrage |
 | `--raccourcis` | recréer seulement l'icône |
 | `--installer-demarrage`, `--retirer-demarrage` | lancement automatique |

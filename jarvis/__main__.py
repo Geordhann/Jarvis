@@ -522,6 +522,9 @@ def main() -> None:
     setup.add_argument("--installer", action="store_true",
                        help="tout installer : icône sur le Bureau et le menu Démarrer, boule, lancement au démarrage")
     setup.add_argument("--raccourcis", action="store_true", help="créer l'icône Jarvis (Bureau + menu Démarrer)")
+    setup.add_argument("--configurer-mobile", action="store_true",
+                       help="parler à Jarvis depuis ton téléphone (Tailscale, voir README)")
+    setup.add_argument("--nouveau-code-mobile", action="store_true", help="changer le code d'accès mobile")
     setup.add_argument("--configurer-sms", action="store_true", help="relier ton téléphone Android pour les SMS")
     setup.add_argument("--installer-demarrage", action="store_true", help="lancer Jarvis à chaque démarrage")
     setup.add_argument("--retirer-demarrage", action="store_true", help="ne plus lancer Jarvis au démarrage")
@@ -627,6 +630,17 @@ def main() -> None:
 
         google_tools.connect(args.connecter_google or None)
         print("Terminé ! Redémarre Jarvis pour qu'il utilise ses nouveaux outils Google.")
+        return
+    if args.configurer_mobile:
+        from . import mobile
+        from .webui import PORT
+
+        return mobile.configure(PORT)
+    if args.nouveau_code_mobile:
+        import secrets
+
+        config.save("code_mobile", f"{secrets.randbelow(10**6):06d}")
+        print(f"Nouveau code d'accès mobile : {config.get('code_mobile')} (redémarre Jarvis)")
         return
     if args.configurer_sms:
         from .tools import sms
