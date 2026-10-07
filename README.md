@@ -98,6 +98,15 @@ Ou à la voix : « Jarvis, présente-moi tes intonations » (il les fait toutes 
 | `droide` | métallique et un peu nasillard |
 | `tactique` | droïde tactique : plus grave, froid et métallique |
 | `robot` | très métallique, façon vieux synthétiseur |
+| `perso` | ta propre chaîne façon Voicemod : PowerPitch → Robotifier → Hauteur |
+
+**Recréer une voix Voicemod sans Voicemod** : l'effet `perso` reproduit la chaîne
+*PowerPitch → Robotifier → Hauteur*, avec les **mêmes réglages que les boutons Voicemod** (0 à 100) :
+```powershell
+python -m jarvis --effet perso
+python -m jarvis --effet-perso 73,100,13   # PowerPitch, mix du Robotifier, Hauteur (défaut : « Tactical Droid »)
+```
+Ou à la voix : « Jarvis, mode perso » / « mode voicemod ». Plus le dernier chiffre est bas, plus la voix est grave.
 
 
 ### Voix de Jarvis dans Voicemod (facultatif)

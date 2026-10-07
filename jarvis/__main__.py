@@ -44,7 +44,7 @@ PLAY_RE = re.compile(r"^(?:mets|lance|joue)(?:-moi)?\s+(?:de la |la |une |un )?"
 ANNOUNCE_OFF_RE = re.compile(r"\b(arrete|stoppe|desactive|coupe) les annonces\b")
 ORB_HIDE_RE = re.compile(r"\b(cache[- ]toi|masque[- ]toi|cache la boule|masque la boule|disparais)\b")
 ORB_SHOW_RE = re.compile(r"\b(montre[- ]toi|affiche[- ]toi|affiche la boule|montre la boule|apparais)\b")
-EFFECT_RE = re.compile(r"\b(?:effet|mode|voix|intonation|ton)(?: de| d')?\s*(droide tactique|tactique|droide|robot|ia)\b")
+EFFECT_RE = re.compile(r"\b(?:effet|mode|voix|intonation|ton)(?: de| d')?\s*(droide tactique|tactique|droide|robot|ia|perso|voicemod)\b")
 EFFECT_OFF_RE = re.compile(r"\b(enleve|retire|coupe|supprime) (l'effet|l'intonation)\b|\bvoix normale\b|\bsans effet\b"
                            r"|\bintonation normale\b")
 EFFECT_DEMO_RE = re.compile(r"\b(fais(?:-moi)? (?:ecouter|entendre)|presente(?:-moi)?|teste|essaie) "
@@ -198,7 +198,7 @@ class Jarvis:
             return True
         effect = EFFECT_RE.search(plain)
         if effect or EFFECT_OFF_RE.search(plain):
-            name = effect.group(1).replace("droide tactique", "tactique") if effect else "aucun"
+            name = effect.group(1).replace("droide tactique", "tactique").replace("voicemod", "perso") if effect else "aucun"
             config.save("effet", name)
             self.voice.say("Effet activé. Comment me trouvez-vous ?" if effect else "Voix normale rétablie.")
             return True
@@ -246,7 +246,8 @@ class Jarvis:
         """Fait entendre chaque intonation (aucune, IA, droïde, droïde tactique, robot)."""
         from . import effects
 
-        labels = {"aucun": "normale", "ia": "IA", "droide": "droïde", "tactique": "droïde tactique", "robot": "robot"}
+        labels = {"aucun": "normale", "ia": "IA", "droide": "droïde", "tactique": "droïde tactique", "robot": "robot",
+                  "perso": "personnalisée"}
         current = config.get("effet") or "aucun"
         for name in effects.PRESETS:
             config.save("effet", name)
@@ -410,7 +411,9 @@ def main() -> None:
     run.add_argument("--muet", action="store_true", help="ne pas lire les réponses à voix haute")
     run.add_argument("--toujours", action="store_true", help="répondre sans attendre « Jarvis »")
     run.add_argument("--voix", default=None, help="voix pour cette session (Daniel, Henri, Denise…)")
-    run.add_argument("--effet", choices=["aucun", "ia", "droide", "tactique", "robot"],
+    run.add_argument("--effet-perso", metavar="POWERPITCH,ROBOT,HAUTEUR",
+                     help="réglages de l'effet perso, comme les boutons Voicemod, ex. 73,100,13 (mémorisé)")
+    run.add_argument("--effet", choices=["aucun", "ia", "droide", "tactique", "robot", "perso"],
                      help="effet sur la voix, sans Voicemod (mémorisé)")
     run.add_argument("--musique-au-lancement", choices=["oui", "non"],
                      help="jouer la musique d'entrée à chaque lancement (désactivé par défaut, mémorisé)")
@@ -445,14 +448,15 @@ def main() -> None:
                       ("sortie_audio", "sortie_audio"), ("micro", "micro"), ("modele", "modele"), ("effort", "effort"), ("effet", "effet"),
                       ("vitesse_voix", "vitesse_voix"), ("hauteur_voix", "hauteur_voix"),
                       ("musique_demarrage", "musique_demarrage"), ("volume_fond", "musique_volume_fond"),
-                      ("musique_au_lancement", "musique_au_lancement"), ("sensibilite_micro", "sensibilite_micro")):
+                      ("musique_au_lancement", "musique_au_lancement"), ("sensibilite_micro", "sensibilite_micro"),
+                      ("effet_perso", "effet_perso")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
             print(f"Réglage « {key} » enregistré.")
             one_shot = one_shot or flag not in ("modele", "effort", "effet", "vitesse_voix", "hauteur_voix",
                                                  "musique_demarrage", "volume_fond", "musique_au_lancement",
-                                                 "sensibilite_micro")
+                                                 "sensibilite_micro", "effet_perso")
     for key in ("sortie_audio", "micro"):
         if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
             config.save(key, None)

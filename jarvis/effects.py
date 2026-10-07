@@ -1,6 +1,6 @@
 """Effets sur la voix de Jarvis (droïde, robot…), appliqués directement : plus besoin de Voicemod.
 
-Réglage mémorisé : python -m jarvis --effet droide   (aucun, ia, droide, tactique, robot)
+Réglage mémorisé : python -m jarvis --effet droide   (aucun, ia, droide, tactique, robot, perso)
 """
 
 from __future__ import annotations
@@ -15,7 +15,14 @@ PRESETS = {
     "droide": "droïde : métallique et un peu nasillard",
     "tactique": "droïde tactique : plus grave, froid et métallique",
     "robot": "robot : très métallique, façon vieux synthétiseur",
+    "perso": "ta chaîne Voicemod : PowerPitch → Robotifier → Hauteur (réglable avec --effet-perso)",
 }
+
+# Réglages de « perso », dans les unités des boutons Voicemod (0 à 100, 50 = neutre pour la hauteur) :
+# PowerPitch, mix du Robotifier, Hauteur. Valeurs de la chaîne « (Copy) Tactical Droid ».
+DEFAULT_PERSO = (73, 100, 13)
+SEMITONES_PER_HALF = 12   # bouton à 0 ou 100 = une octave plus bas ou plus haut
+ROBOT_HZ = 100            # note du bourdonnement robotique (avant la dernière transposition)
 
 
 def current() -> str:
@@ -30,6 +37,55 @@ def _ring_mod(audio, sample_rate: int, freq: float, mix: float):
     t = np.arange(audio.shape[-1], dtype=np.float32) / sample_rate
     carrier = np.sin(2 * np.pi * freq * t).astype(np.float32)
     return (1 - mix) * audio + mix * audio * carrier
+
+
+def perso_settings() -> tuple[float, float, float]:
+    raw = config.get("effet_perso") or ""
+    try:
+        values = tuple(float(v) for v in raw.replace(";", ",").split(","))
+        if len(values) == 3:
+            return values  # type: ignore[return-value]
+    except ValueError:
+        pass
+    return DEFAULT_PERSO
+
+
+def _knob_to_semitones(value: float) -> float:
+    return (value - 50) / 50 * SEMITONES_PER_HALF
+
+
+def _robotize(audio, sample_rate: int, mix: float, freq: float = ROBOT_HZ):
+    """Robotifier : supprime la phase de chaque petit bloc de son → voix monocorde et bourdonnante."""
+    import numpy as np
+
+    hop = max(32, int(sample_rate / freq))
+    size = hop * 2
+    window = np.hanning(size).astype(np.float32)
+    result = np.zeros_like(audio)
+    for ch in range(audio.shape[0]):
+        x = np.concatenate([audio[ch], np.zeros(size, dtype=np.float32)])
+        y = np.zeros_like(x)
+        for start in range(0, len(x) - size, hop):
+            magnitude = np.abs(np.fft.rfft(x[start:start + size] * window))
+            frame = np.fft.fftshift(np.fft.irfft(magnitude, size)).astype(np.float32)
+            y[start:start + size] += frame * window
+        y = y[:audio.shape[1]]
+        # Même volume moyen que la voix d'origine.
+        rms_in, rms_out = np.sqrt(np.mean(audio[ch] ** 2)), np.sqrt(np.mean(y ** 2))
+        if rms_out > 1e-9:
+            y *= rms_in / rms_out
+        result[ch] = (1 - mix) * audio[ch] + mix * y
+    return result
+
+
+def _perso(audio, sample_rate: int):
+    from pedalboard import Compressor, Gain, HighpassFilter, Pedalboard, PitchShift
+
+    power_pitch, robot_mix, pitch = perso_settings()
+    audio = Pedalboard([PitchShift(semitones=_knob_to_semitones(power_pitch))])(audio, sample_rate)
+    audio = _robotize(audio, sample_rate, mix=max(0.0, min(1.0, robot_mix / 100)))
+    return Pedalboard([PitchShift(semitones=_knob_to_semitones(pitch)), HighpassFilter(60),
+                       Compressor(threshold_db=-18, ratio=3), Gain(4)])(audio, sample_rate)
 
 
 def _board(name: str):
@@ -66,11 +122,14 @@ def apply(mp3: bytes, name: str | None = None) -> tuple[bytes, str]:
 
         with AudioFile(io.BytesIO(mp3)) as f:
             audio, sample_rate = f.read(f.frames), f.samplerate
-        ring, board = _board(name)
-        if ring:
-            audio = _ring_mod(audio, sample_rate, *ring)
-        if board is not None:
-            audio = board(audio, sample_rate)
+        if name == "perso":
+            audio = _perso(audio, sample_rate)
+        else:
+            ring, board = _board(name)
+            if ring:
+                audio = _ring_mod(audio, sample_rate, *ring)
+            if board is not None:
+                audio = board(audio, sample_rate)
         audio = np.clip(audio, -1.0, 1.0)
         out = io.BytesIO()
         with AudioFile(out, "w", sample_rate, audio.shape[0], format="wav") as f:
