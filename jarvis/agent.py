@@ -144,7 +144,9 @@ class Agent:
             if sms_tools.is_configured()
             else "Les SMS ne sont pas configurés : si on te le demande, explique qu'il faut lancer "
                  "« python -m jarvis --configurer-sms »."
-        ) + " Tu ne peux pas lire ses SMS reçus ni ses conversations WhatsApp ou Telegram."
+        ) + (" WhatsApp : tu lis ses discussions (whatsapp_lire) et tu envoies des messages depuis son compte "
+           "(whatsapp_preparer puis, après son oui, whatsapp_envoyer) ; voir la skill whatsapp. "
+           "Tu ne peux pas lire ses SMS reçus.")
         self.system = SYSTEM_PROMPT.format(
             messages_note=messages_note,
             profile=profile.read() or "(profil vide)",

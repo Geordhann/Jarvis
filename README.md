@@ -259,6 +259,16 @@ profil, mémoire), te lit le message et attend ton « oui ». Le téléphone doi
 Internet. Désactive l'optimisation de batterie pour l'appli pour qu'elle reste active.
 Jarvis ne lit pas tes SMS reçus.
 
+### WhatsApp
+Avec **ton** compte, via l'appli WhatsApp du PC (ou WhatsApp Web) : installe **WhatsApp** depuis le
+Microsoft Store et connecte-la une fois en scannant le QR code avec ton téléphone
+(WhatsApp → ⋮ → Appareils connectés). Ensuite :
+- « Jarvis, j'ai des messages WhatsApp ? » : il ouvre WhatsApp et te résume les discussions.
+- « Jarvis, envoie un WhatsApp à Paul pour lui dire que j'arrive » : il trouve le numéro dans tes
+  contacts Google, écrit le message dans la conversation, te le lit et ne l'envoie qu'après ton « oui ».
+
+Pas de robot non officiel (ils peuvent faire bannir ton numéro) : Jarvis utilise l'appli comme toi.
+
 ### Instagram, Snapchat et autres réseaux
 Ces réseaux n'offrent aucun accès officiel aux comptes personnels (les outils non officiels peuvent
 faire bannir ton compte). Jarvis passe donc par ton écran : « ouvre mes messages Instagram »,
@@ -368,7 +378,7 @@ description: Préparer un devis client à partir d'une demande reçue par mail.
 ```
 
 Jarvis voit la liste des skills et lit la fiche quand une demande correspond. Fiches fournies :
-`briefing-matin`, `tri-mails`, `redaction-mail`, `envoyer-sms`, `reseaux-sociaux`, `planifier-rdv`, `souvenir`.
+`briefing-matin`, `tri-mails`, `redaction-mail`, `envoyer-sms`, `whatsapp`, `reseaux-sociaux`, `planifier-rdv`, `souvenir`.
 
 ## 5. Combien ça coûte ?
 

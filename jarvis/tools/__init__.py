@@ -65,9 +65,9 @@ def boolean(description: str) -> dict:
 
 
 def all_tools(skills_map) -> list[Tool]:
-    from . import apps, browser, google, media, sms, utilities
+    from . import apps, browser, google, media, sms, utilities, whatsapp
 
-    return [*google.tools(), *sms.tools(), *media.tools(), *apps.tools(), *utilities.tools(),
+    return [*google.tools(), *sms.tools(), *whatsapp.tools(), *media.tools(), *apps.tools(), *utilities.tools(),
             *browser.tools(),
             _skill_tool(skills_map), _reply_tool()]
 
