@@ -69,6 +69,23 @@ class Ears:
             print(f"[écoute] service de reconnaissance indisponible : {exc}")
             return None
 
+    def listen_short(self) -> str | None:
+        """Écoute brève pendant que Jarvis parle, pour entendre « stop ». Le seuil est remis
+        ensuite : la voix de Jarvis dans le micro ne doit pas rendre l'écoute normale moins sensible."""
+        sr = self.sr
+        threshold = self.recognizer.energy_threshold
+        try:
+            with self.microphone as source:
+                audio = self.recognizer.listen(source, timeout=1, phrase_time_limit=3)
+        except sr.WaitTimeoutError:
+            return None
+        finally:
+            self.recognizer.energy_threshold = threshold
+        try:
+            return self.recognizer.recognize_google(audio, language=self.language)
+        except (sr.UnknownValueError, sr.RequestError):
+            return None
+
 
 def test_microphone() -> None:
     """python -m jarvis --tester-micro : affiche ce que Jarvis comprend, pour régler la sensibilité."""

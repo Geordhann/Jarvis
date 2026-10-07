@@ -267,6 +267,11 @@ c'est toi qui l'envoies).
 
 ## 3. Utilisation
 
+### Couper Jarvis
+Pendant qu'il parle, dis **« stop »**, « tais-toi », « chut » ou « ça suffit » (ou clique sur la boule) :
+il se tait tout de suite et t'écoute, sans avoir à redire « Jarvis ».
+Pour désactiver : `python -m jarvis --interruption non`.
+
 ```bash
 python -m jarvis --interface   # pareil, et ouvre l'interface dans le navigateur
 python -m jarvis --sans-micro  # sans écoute au micro (interface et messageries seulement)

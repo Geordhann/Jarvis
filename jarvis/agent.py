@@ -199,8 +199,17 @@ class Agent:
         if ready:  # réplique prête : instantané, sans appeler Claude
             on_sentence(ready)
             return ready
-        now = datetime.datetime.now()
         start = len(self.messages)
+        try:
+            return self._turn(text, on_sentence, on_tool, start)
+        except BaseException:
+            # Interrompu (« Jarvis, stop ») ou erreur : on retire ce tour inachevé pour
+            # garder une conversation valide pour la question suivante.
+            del self.messages[start:]
+            raise
+
+    def _turn(self, text: str, on_sentence, on_tool, start: int) -> str:
+        now = datetime.datetime.now()
         self.messages.append({"role": "user", "content": f"[{french_date(now.date())}, {french_time(now)}]\n{text}"})
         splitter = SentenceSplitter(on_sentence)
         answer: list[str] = []

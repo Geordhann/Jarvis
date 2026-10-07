@@ -54,3 +54,20 @@ def take_visibility_request() -> str | None:
     with _lock:
         action, _visibility_request = _visibility_request, None
         return action
+
+
+_stop_requested = False
+
+
+def request_stop() -> None:
+    """Clic sur la boule pendant que Jarvis parle : il doit se taire."""
+    global _stop_requested
+    with _lock:
+        _stop_requested = True
+
+
+def take_stop_request() -> bool:
+    global _stop_requested
+    with _lock:
+        requested, _stop_requested = _stop_requested, False
+        return requested

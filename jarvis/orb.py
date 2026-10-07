@@ -246,7 +246,10 @@ def run(on_quit=None) -> None:
                 if self.moved:
                     config.save("orbe_position", f"{self.x()},{self.y()}")
                 else:
-                    state.wake()  # clic simple : « je t'écoute »
+                    if state.get()[0] == state.SPEAKING:
+                        state.request_stop()  # clic pendant qu'il parle : il se tait
+                    else:
+                        state.wake()  # clic simple : « je t'écoute »
                 self.drag_from = None
 
         def mouseDoubleClickEvent(self, _event=None) -> None:

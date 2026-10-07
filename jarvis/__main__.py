@@ -57,6 +57,8 @@ VOICE_DEMO_RE = re.compile(r"\b(fais(?:-moi)? (?:ecouter|entendre)|presente(?:-m
 CLARITY_RE = re.compile(r"\bvoix (plus |moins )?(claire|nette|sombre|etouffee)\b|\bmoins etouffee?\b")
 LOUDNESS_RE = re.compile(r"\bparle (plus|moins) fort\b|\b(augmente|monte|baisse|diminue) (?:le volume de )?ta voix\b")
 ANNOUNCE_ON_RE = re.compile(r"\b(active|reactive|remets) les annonces\b")
+# Pendant que Jarvis parle : « stop », « tais-toi », « chut »… le font taire (texte sans accents).
+INTERRUPT_RE = re.compile(r"\b(stop|stoppe|tais[- ]toi|taisez[- ]vous|silence|chut|arrete|ca suffit)\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
 
 
@@ -74,6 +76,10 @@ def strip_wake_word(text: str) -> str | None:
     # Les accents retirés ne changent pas la longueur pour le français courant ;
     # on recoupe donc le texte original à la même position.
     return text[match.end():].strip() if len(plain) == len(text) else plain[match.end():].strip()
+
+
+class Interrupted(Exception):
+    """« Jarvis, stop » pendant une réponse : on arrête de la générer."""
 
 
 class Jarvis:
@@ -114,11 +120,13 @@ class Jarvis:
             if request is None:
                 continue  # on ne m'a pas appelé : je reste silencieux
             if not request:
+                self.voice.resume()
                 self.voice.say(f"Oui, {self.title} ?")
                 self._done_speaking()
                 continue
 
-            if not self.handle(request):
+            self.voice.resume()
+            if not self._watch(lambda: self.handle(request)):
                 break
             self._done_speaking()
 
@@ -148,8 +156,53 @@ class Jarvis:
     def _done_speaking(self) -> None:
         # On attend la fin de la parole pour ne pas s'entendre soi-même,
         # puis on ouvre une courte fenêtre pour enchaîner sans redire « Jarvis ».
-        self.voice.wait()
+        self._watch(lambda: True)
+        self.voice.resume()  # après un « stop », les annonces et rappels peuvent de nouveau parler
         self.awake_until = time.monotonic() + FOLLOW_UP_SECONDS
+
+    # --- interruption ------------------------------------------------------
+
+    def _watch(self, work):
+        """Lance `work` à côté et, tant que Jarvis parle, écoute si on lui dit « stop ».
+        Le micro reste utilisé par ce seul fil (deux écoutes en même temps font planter Windows)."""
+        result = [True]
+
+        def run() -> None:
+            try:
+                result[0] = work()
+            except Interrupted:
+                pass
+            except Exception as exc:  # une commande qui plante ne doit pas arrêter Jarvis
+                print(f"[erreur] {exc}")
+                self.voice.say("Un problème est survenu.")
+
+        worker = threading.Thread(target=run, daemon=True, name="demande")
+        worker.start()
+        listen = self.ears is not None and (config.get("interruption") or "oui") != "non"
+        while worker.is_alive() or self.voice.busy():
+            if state.take_stop_request():
+                self.interrupt()
+            elif listen and state.get()[0] == state.SPEAKING and not self.voice.stopped:
+                heard = self.ears.listen_short()
+                if heard and self._is_stop(heard):
+                    print(f"VOUS › {heard}")
+                    self.interrupt()
+            else:
+                time.sleep(0.1)
+        worker.join()
+        return result[0]
+
+    def _is_stop(self, heard: str) -> bool:
+        words = set(INTERRUPT_RE.findall(_plain(heard)))
+        # Le micro entend aussi Jarvis : on ignore ce qu'il est lui-même en train de dire.
+        return bool(words) and not words <= set(INTERRUPT_RE.findall(_plain(state.get()[1])))
+
+    def interrupt(self) -> None:
+        if self.voice.stopped:
+            return
+        self.voice.stop()
+        state.wake()  # la phrase suivante est prise sans redire « Jarvis »
+        print("[interruption] Jarvis se tait.")
 
     # --- commandes ---------------------------------------------------------
 
@@ -310,10 +363,15 @@ class Jarvis:
             return True
         return False
 
+    def _say_or_stop(self, sentence: str) -> None:
+        if self.voice.stopped:
+            raise Interrupted  # on arrête de générer une réponse que personne n'écoute
+        self.voice.say(sentence)
+
     def _ask_agent(self, request: str) -> None:
         state.set(state.THINKING)
         try:
-            self.agent.ask(request, on_sentence=self.voice.say)
+            self.agent.ask(request, on_sentence=self._say_or_stop)
         except anthropic.AuthenticationError:
             self.voice.say("Ma clé d'accès à Claude est invalide. Relancez la configuration.")
         except anthropic.RateLimitError:
@@ -456,6 +514,8 @@ def main() -> None:
                      help="opus, sonnet (2x moins cher) ou haiku (4x moins cher) ; mémorisé")
     run.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"],
                      help="profondeur de réflexion (low = plus rapide) ; mémorisé")
+    run.add_argument("--interruption", choices=["oui", "non"],
+                     help="pouvoir couper Jarvis en disant « stop » pendant qu'il parle (défaut oui)")
     run.add_argument("--fond", action="store_true", help=argparse.SUPPRESS)  # lancement automatique
     args = parser.parse_args()
 
@@ -474,7 +534,7 @@ def main() -> None:
                       ("musique_demarrage", "musique_demarrage"), ("volume_fond", "musique_volume_fond"),
                       ("musique_au_lancement", "musique_au_lancement"), ("sensibilite_micro", "sensibilite_micro"),
                       ("effet_perso", "effet_perso"), ("effet_perso_clarte", "effet_perso_clarte"),
-                      ("volume_voix", "volume_voix")):
+                      ("volume_voix", "volume_voix"), ("interruption", "interruption")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
@@ -482,7 +542,7 @@ def main() -> None:
             one_shot = one_shot or flag not in ("modele", "effort", "effet", "vitesse_voix", "hauteur_voix",
                                                  "musique_demarrage", "volume_fond", "musique_au_lancement",
                                                  "sensibilite_micro", "effet_perso", "effet_perso_clarte",
-                                                 "volume_voix")
+                                                 "volume_voix", "interruption")
     for key in ("sortie_audio", "micro"):
         if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
             config.save(key, None)
