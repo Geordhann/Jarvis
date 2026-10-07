@@ -4,7 +4,7 @@
     "reponses": ["Pour vous, toujours, {titre}.", "Toujours là, {titre}.", "À votre écoute, {titre}."]
   },
   {
-    "questions": ["qui es-tu", "t'es qui", "présente-toi", "comment tu t'appelles"],
+    "questions": ["t'es qui", "comment tu t'appelles"],
     "reponses": ["Je suis JARVIS. Just A Rather Very Intelligent System. Votre assistant personnel, {titre}."]
   },
   {

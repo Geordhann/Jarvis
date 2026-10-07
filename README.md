@@ -282,6 +282,38 @@ Pendant qu'il parle, dis **« stop »**, « tais-toi », « chut » ou « ça su
 il se tait tout de suite et t'écoute, sans avoir à redire « Jarvis ».
 Pour désactiver : `python -m jarvis --interruption non`.
 
+### Effets Iron Man
+- **Bruitages** : réacteur au démarrage, bip quand tu dis juste « Jarvis », bip quand il a compris,
+  coupure quand tu dis « stop ». « Jarvis, coupe les bruitages » / « active les bruitages ».
+- **La boule change de couleur** : rouge pour une alerte (nouveau mail, rappel, problème), vert quand
+  une tâche est finie, doré pendant sa présentation. Elle **bat au rythme du son** du PC (musique,
+  vidéo, sa propre voix).
+- **Personnalités** : « Jarvis, mode sarcastique » (le JARVIS des films, en plus mordant), « mode
+  sérieux », « mode motivant », « mode drôle », « mode majordome », « mode classique ».
+- **« Jarvis, présente-toi »** : sa présentation façon film, avec musique d'entrée si tu l'as.
+
+### Jeux
+- **« Jarvis, lance Rocket League »** : lance directement un jeu Steam installé, même avec un nom
+  approximatif ou un sigle (« lance RL », « lance GTA 5 »).
+- **« Jarvis, mode gaming »** (ou « mode combat ») : coupe les notifications Windows, passe le PC en
+  performances maximales et ferme les applis que tu as choisies une fois pour toutes :
+  `python -m jarvis --applis-gaming "onedrive,chrome"`. « Jarvis, fin du mode gaming » remet tout.
+- **Coach** : « Jarvis, regarde mon écran, comment je bats ce boss ? » : il regarde le jeu et te
+  donne 2-3 conseils courts.
+
+### Traducteur
+« Jarvis, dis à mon pote en anglais qu'on commence dans 5 minutes » : il traduit et le dit à voix haute
+avec une voix anglaise (aussi espagnol, allemand, italien, portugais, arabe, japonais, chinois…).
+
+### Jarvis sur Discord
+« Jarvis, dis sur Discord que j'arrive dans 2 minutes » : tes amis l'entendent dans le vocal.
+Installation une seule fois :
+1. Installe **VB-Cable** (gratuit) : <https://vb-audio.com/Cable/>, puis redémarre le PC.
+2. Pour que tes amis t'entendent toi aussi : Windows → Paramètres → Son → **Plus de paramètres de son**
+   → onglet **Enregistrement** → ton micro → **Propriétés** → onglet **Écouter** → coche
+   **Écouter ce périphérique** → « Lecture sur ce périphérique » : **CABLE Input** → OK.
+3. Dans Discord → Paramètres → Voix et vidéo → **Périphérique d'entrée : CABLE Output**.
+
 ### Phrases longues
 Prends ton temps : dès que tu parles plus de 4 secondes, une petite pause pour réfléchir ne coupe
 plus ta phrase. Et si tu t'arrêtes sur « et », « pour », « parce que »…, Jarvis attend la suite.

@@ -37,6 +37,23 @@ def available() -> bool:
     return True
 
 
+def _audio_meter():
+    """Mesure du niveau de la sortie son de Windows (pycaw) ; None si indisponible."""
+    try:
+        from ctypes import POINTER, cast
+
+        from comtypes import CLSCTX_ALL
+        from pycaw.pycaw import AudioUtilities, IAudioMeterInformation
+
+        speakers = AudioUtilities.GetSpeakers()
+        device = getattr(speakers, "_dev", speakers)  # selon la version de pycaw
+        meter = device.Activate(IAudioMeterInformation._iid_, CLSCTX_ALL, None)
+        return cast(meter, POINTER(IAudioMeterInformation))
+    except Exception as exc:
+        print(f"[boule] niveau du son indisponible ({exc}) : pas de pulsation sur la musique.")
+        return None
+
+
 def run(on_quit=None) -> None:
     """Affiche la boule ; bloque jusqu'à sa fermeture (à appeler dans le fil principal)."""
     from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
@@ -63,6 +80,7 @@ def run(on_quit=None) -> None:
             self.drag_from = None
             self.moved = False
             self.last = time.monotonic()
+            self.meter = _audio_meter()  # niveau du son du PC : la boule pulse avec la musique
             self.timer = QTimer(self, timeout=self.tick)
             self.timer.start(16)  # ~60 images par seconde
 
@@ -123,8 +141,11 @@ def run(on_quit=None) -> None:
                 target = 0.35 + 0.25 * math.sin(now * 6)
             else:
                 target = 0.15 + 0.1 * math.sin(now * 1.5)
+            peak = self._peak()
+            if peak > 0.02:  # musique, vidéo ou voix de Jarvis : la boule bat au rythme du son
+                target = max(target if current != state.SPEAKING else 0.3, min(1.0, 0.2 + peak * 1.3))
             self.level += (target - self.level) * min(1.0, dt * 12)
-            goal = QColor(*COLORS.get(current, COLORS[state.IDLE]))
+            goal = QColor(*(state.flash_color() or COLORS.get(current, COLORS[state.IDLE])))
             mix = min(1.0, dt * 6)
             self.color = QColor(
                 int(self.color.red() + (goal.red() - self.color.red()) * mix),
@@ -132,6 +153,15 @@ def run(on_quit=None) -> None:
                 int(self.color.blue() + (goal.blue() - self.color.blue()) * mix),
             )
             self.update()
+
+        def _peak(self) -> float:
+            if self.meter is None:
+                return 0.0
+            try:
+                return float(self.meter.GetPeakValue())
+            except Exception:
+                self.meter = None  # sortie son changée ou débranchée : on arrête d'écouter
+                return 0.0
 
         def _c(self, alpha: int) -> QColor:
             c = QColor(self.color)

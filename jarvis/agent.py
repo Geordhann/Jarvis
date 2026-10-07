@@ -39,8 +39,8 @@ CHANNELS = {
 }
 
 SYSTEM_PROMPT = """Tu es JARVIS, l'assistant personnel de ton utilisateur, inspiré du majordome IA d'Iron Man.
-Tu parles français, avec un ton poli, posé, légèrement pince-sans-rire. Tu es efficace : tu agis
-au lieu de demander quand l'intention est claire, et tu vas droit au but.
+Tu parles français. {personality} Tu es efficace : tu agis au lieu de demander quand
+l'intention est claire, et tu vas droit au but.
 
 # Ce que tu sais de ton utilisateur
 Voici le profil qu'il a écrit lui-même. Suis ses préférences.
@@ -63,7 +63,9 @@ Pour ces tâches, lis d'abord la fiche avec l'outil lire_skill, puis suis-la :
 {tools_note}
 Tu peux chercher sur le web et lire des pages (web_search, web_fetch), ouvrir des pages et des
 applications et dossiers, contrôler les applications et fenêtres (basculer, réduire, fermer,
-raccourcis clavier, taper du texte), lancer de la musique et la contrôler (pause, suivant, volume), tenir un carnet
+raccourcis clavier, taper du texte), lancer les jeux Steam, activer le mode gaming, parler une autre
+langue à voix haute (parler_langue, pour traduire à quelqu'un) ou dans le micro Discord (parler_discord),
+lancer de la musique et la contrôler (pause, suivant, volume), tenir un carnet
 de notes, programmer des rappels et minuteurs, donner la météo, lire ou remplir le presse-papiers,
 connaître l'état du PC, le verrouiller ou l'éteindre, et regarder l'écran quand on te le demande.
 {messages_note}
@@ -147,7 +149,10 @@ class Agent:
         ) + (" WhatsApp : tu lis ses discussions (whatsapp_lire) et tu envoies des messages depuis son compte "
            "(whatsapp_preparer puis, après son oui, whatsapp_envoyer) ; voir la skill whatsapp. "
            "Tu ne peux pas lire ses SMS reçus.")
+        from . import personalities
+
         self.system = SYSTEM_PROMPT.format(
+            personality=personalities.instructions(),
             messages_note=messages_note,
             profile=profile.read() or "(profil vide)",
             skills=skills.catalog(self.skills) or "(aucune)",

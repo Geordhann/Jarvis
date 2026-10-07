@@ -13,10 +13,10 @@ import unicodedata
 
 import anthropic
 
-from . import announcer, autostart, config, orb, reminders, startup_music, state, profile, repliques, services, sessions, voices
+from . import announcer, autostart, config, orb, reminders, sounds, startup_music, state, profile, repliques, services, sessions, voices
 from .agent import MODELS, french_date, french_time
 from .tools import ToolFailure, media
-from .voice import Voice
+from .voice import Voice, register_main
 
 # La reconnaissance vocale écrit parfois « Jarvis » de travers.
 WAKE_RE = re.compile(r"\b(jarvis|jarvi|jarvice|jarviss|jervis|djarvis|jarwis)\b[\s,.!?]*")
@@ -59,6 +59,14 @@ LOUDNESS_RE = re.compile(r"\bparle (plus|moins) fort\b|\b(augmente|monte|baisse|
 ANNOUNCE_ON_RE = re.compile(r"\b(active|reactive|remets) les annonces\b")
 # Pendant que Jarvis parle : « stop », « tais-toi », « chut »… le font taire (texte sans accents).
 INTERRUPT_RE = re.compile(r"\b(stop|stoppe|tais[- ]toi|taisez[- ]vous|silence|chut|arrete|ca suffit)\b")
+PERSONALITY_RE = re.compile(r"\b(?:mode|personnalite|sois|deviens|caractere)\s+(classique|normale?|sarcastique|ironique|"
+                            r"serieux|serieuse|motivant|coach|drole|marrant|comique|majordome)\b")
+SOUNDS_RE = re.compile(r"\b(coupe|desactive|arrete|active|remets|reactive) (?:les )?(bruitages|bips|sons)\b")
+GAME_RE = re.compile(r"^(?:lance|demarre|ouvre|joue a|lance le jeu|mets le jeu)(?:-moi)?\s+(?:le jeu\s+)?(.+)$")
+GAMING_OFF_RE = re.compile(r"\b(?:fin du|quitte(?:r)? le|desactive(?:r)? le|arrete(?:r)? le|sors du|stop) mode "
+                           r"(?:gaming|combat|jeu)\b")
+GAMING_ON_RE = re.compile(r"\bmode (?:gaming|combat|jeu)\b")
+PRESENT_RE = re.compile(r"\b(presente[- ]toi|presentes[- ]toi|qui es[- ]tu)\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
 
 
@@ -91,6 +99,7 @@ class Jarvis:
         self.voice = Voice(voice=args.voix, muted=args.muet)
         self.ears = None if args.texte else _init_ears(retry=args.fond)
         self.awake_until = 0.0
+        register_main(self.voice)  # pour le traducteur et la voix sur Discord
 
     @property
     def agent(self):
@@ -100,11 +109,14 @@ class Jarvis:
 
     def run(self) -> None:
         if not self.voice.muted:
-            announcer.start(self.voice.say)
-        reminders.on_due(self.voice.say)
+            announcer.start(self._alert)
+        reminders.on_due(self._alert)
         # Musique d'entrée seulement si l'utilisateur l'a activée (--musique-au-lancement oui).
         if not self.voice.muted and config.get("musique_au_lancement") == "oui" and startup_music.play():
             time.sleep(4)  # quelques secondes d'intro avant de saluer
+        elif not self.voice.muted and sounds.enabled():
+            sounds.play("demarrage")
+            time.sleep(1.4)
         self.voice.say(f"Bonjour {self.title}. Tous les systèmes sont opérationnels.")
         self.voice.wait()
 
@@ -121,11 +133,13 @@ class Jarvis:
                 continue  # on ne m'a pas appelé : je reste silencieux
             if not request:
                 self.voice.resume()
+                sounds.play("ecoute")
                 self.voice.say(f"Oui, {self.title} ?")
                 self._done_speaking()
                 continue
 
             self.voice.resume()
+            sounds.play("fin")
             if not self._watch(lambda: self.handle(request)):
                 break
             self._done_speaking()
@@ -201,8 +215,14 @@ class Jarvis:
         if self.voice.stopped:
             return
         self.voice.stop()
+        sounds.play("stop")
         state.wake()  # la phrase suivante est prise sans redire « Jarvis »
         print("[interruption] Jarvis se tait.")
+
+    def _alert(self, message: str) -> None:
+        """Nouveau mail, rappel : la boule passe au rouge pendant l'annonce."""
+        state.flash(state.ALERT, 6)
+        self.voice.say(message)
 
     # --- commandes ---------------------------------------------------------
 
@@ -220,6 +240,34 @@ class Jarvis:
         if any(w in plain for w in RESET_WORDS):
             sessions.reset("voix")
             self.voice.say("C'est oublié. On repart de zéro.")
+            return True
+        if PRESENT_RE.search(plain):
+            self.present()
+            return True
+        if GAMING_OFF_RE.search(plain) or GAMING_ON_RE.search(plain):
+            return self._gaming(not GAMING_OFF_RE.search(plain))
+        persona = PERSONALITY_RE.search(plain)
+        if persona:
+            from . import personalities
+
+            name = personalities.resolve(persona.group(1))
+            config.save("personnalite", name)
+            sessions.reload_all()
+            replies = {"classique": "Retour à la normale, {t}.",
+                       "sarcastique": "Mode sarcastique activé. Enfin un peu de piquant, {t}.",
+                       "serieux": "Mode sérieux activé.",
+                       "motivant": "Mode coach activé ! On va tout déchirer aujourd'hui, {t} !",
+                       "drole": "Mode humour activé. Accrochez-vous, {t}.",
+                       "majordome": "Fort bien, {t}. Je me tiens à votre entière disposition."}
+            self.voice.say(replies[name].format(t=self.title))
+            return True
+        bips = SOUNDS_RE.search(plain)
+        if bips:
+            on = bips.group(1) in ("active", "remets", "reactive")
+            config.save("bruitages", "oui" if on else "non")
+            self.voice.say("Bruitages activés." if on else "Bruitages coupés.")
+            return True
+        if self._handle_game(plain):
             return True
         if VOICE_DEMO_RE.search(plain):
             self.voice_demo()
@@ -363,6 +411,61 @@ class Jarvis:
             return True
         return False
 
+    def _handle_game(self, plain: str) -> bool:
+        """« Lance Rocket League » : démarre directement un jeu Steam installé, sans appeler Claude."""
+        match = GAME_RE.match(plain.strip(" .!?"))
+        if not match or re.search(r"\b(musique|chanson|morceau|playlist|video)\b", plain):
+            return False
+        from .tools.games import find_game, lancer_jeu
+
+        try:
+            found = find_game(match.group(1))
+        except Exception:
+            return False
+        if not found:
+            return False  # pas un jeu : on laisse Claude décider (ouvrir une appli…)
+        lancer_jeu(found[0])
+        state.flash(state.DONE, 3)
+        self.voice.say(f"Lancement de {found[0]}. Bon jeu, {self.title}.")
+        return True
+
+    def _gaming(self, on: bool) -> bool:
+        from .tools.gaming import mode_gaming
+
+        try:
+            mode_gaming(on)
+        except ToolFailure as exc:
+            self.voice.say(f"Impossible : {exc}.")
+            return True
+        if on:
+            state.flash(state.ALERT, 4)
+            self.voice.say(f"Mode combat activé. Notifications coupées, puissance maximale. Systèmes optimisés "
+                           f"pour le combat, {self.title}.")
+        else:
+            state.flash(state.DONE, 3)
+            self.voice.say("Mode gaming désactivé. Retour à la normale.")
+        return True
+
+    def present(self) -> None:
+        """« Jarvis, présente-toi » : la présentation façon film, pour épater la galerie."""
+        state.flash(state.SHOW, 25)
+        music = startup_music.play()
+        sounds.play("demarrage")
+        time.sleep(3 if music else 1.4)
+        for line in (
+            "Bonjour à tous.",
+            "Je suis JARVIS. Just A Rather Very Intelligent System.",
+            f"Je suis l'assistant personnel de {self.title}.",
+            "Je gère ses mails, son agenda, sa musique et ses jeux, je surveille ses messages, "
+            "je parle plusieurs langues, et je ne dors jamais.",
+            f"Et si quelqu'un touche à son ordinateur sans permission… disons que {self.title} le saura.",
+        ):
+            self.voice.say(line)
+        self.voice.wait()
+        if music:
+            startup_music.stop()
+        state.flash(state.DONE, 2)
+
     def _say_or_stop(self, sentence: str) -> None:
         if self.voice.stopped:
             raise Interrupted  # on arrête de générer une réponse que personne n'écoute
@@ -371,8 +474,12 @@ class Jarvis:
     def _ask_agent(self, request: str) -> None:
         state.set(state.THINKING)
         try:
-            self.agent.ask(request, on_sentence=self._say_or_stop)
+            used_tools: list[str] = []
+            self.agent.ask(request, on_sentence=self._say_or_stop, on_tool=used_tools.append)
+            if used_tools:
+                state.flash(state.DONE, 3)  # tâche terminée : la boule passe au vert
         except anthropic.AuthenticationError:
+            state.flash(state.ALERT, 5)
             self.voice.say("Ma clé d'accès à Claude est invalide. Relancez la configuration.")
         except anthropic.RateLimitError:
             self.voice.say("Je suis un peu surchargé. Réessayez dans un instant.")
@@ -380,6 +487,7 @@ class Jarvis:
             print(f"[erreur API] {exc.status_code} : {exc.message}")
             self.voice.say("Un problème est survenu avec mes serveurs.")
         except anthropic.APIConnectionError:
+            state.flash(state.ALERT, 5)
             self.voice.say("Je n'arrive pas à joindre mes serveurs. Vérifiez la connexion Internet.")
 
 
@@ -514,6 +622,12 @@ def main() -> None:
                      help="opus, sonnet (2x moins cher) ou haiku (4x moins cher) ; mémorisé")
     run.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"],
                      help="profondeur de réflexion (low = plus rapide) ; mémorisé")
+    run.add_argument("--bruitages", choices=["oui", "non"], help="bips et sons Iron Man (défaut oui)")
+    run.add_argument("--personnalite", choices=["classique", "sarcastique", "serieux", "motivant", "drole", "majordome"],
+                     help="caractère de Jarvis (mémorisé)")
+    run.add_argument("--applis-gaming", metavar="NOMS",
+                     help="applis à fermer en mode gaming, séparées par des virgules (ex. « chrome,onedrive »)")
+    run.add_argument("--sortie-discord", metavar="NOM", help="sortie audio vers Discord (défaut « CABLE Input »)")
     run.add_argument("--interruption", choices=["oui", "non"],
                      help="pouvoir couper Jarvis en disant « stop » pendant qu'il parle (défaut oui)")
     run.add_argument("--fond", action="store_true", help=argparse.SUPPRESS)  # lancement automatique
@@ -534,7 +648,9 @@ def main() -> None:
                       ("musique_demarrage", "musique_demarrage"), ("volume_fond", "musique_volume_fond"),
                       ("musique_au_lancement", "musique_au_lancement"), ("sensibilite_micro", "sensibilite_micro"),
                       ("effet_perso", "effet_perso"), ("effet_perso_clarte", "effet_perso_clarte"),
-                      ("volume_voix", "volume_voix"), ("interruption", "interruption")):
+                      ("volume_voix", "volume_voix"), ("interruption", "interruption"),
+                      ("bruitages", "bruitages"), ("personnalite", "personnalite"),
+                      ("applis_gaming", "applis_gaming"), ("sortie_discord", "sortie_discord")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
@@ -542,7 +658,8 @@ def main() -> None:
             one_shot = one_shot or flag not in ("modele", "effort", "effet", "vitesse_voix", "hauteur_voix",
                                                  "musique_demarrage", "volume_fond", "musique_au_lancement",
                                                  "sensibilite_micro", "effet_perso", "effet_perso_clarte",
-                                                 "volume_voix", "interruption")
+                                                 "volume_voix", "interruption", "bruitages",
+                                                 "personnalite", "applis_gaming", "sortie_discord")
     for key in ("sortie_audio", "micro"):
         if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
             config.save(key, None)

@@ -71,3 +71,21 @@ def take_stop_request() -> bool:
     with _lock:
         requested, _stop_requested = _stop_requested, False
         return requested
+
+
+# Couleur passagère de la boule : rouge pour une alerte, vert quand une tâche est finie…
+ALERT, DONE, SHOW = (255, 70, 60), (80, 230, 130), (255, 210, 90)
+_flash: tuple[tuple[int, int, int], float] | None = None
+
+
+def flash(color: tuple[int, int, int], seconds: float = 3.0) -> None:
+    global _flash
+    with _lock:
+        _flash = (color, time.monotonic() + seconds)
+
+
+def flash_color() -> tuple[int, int, int] | None:
+    with _lock:
+        if _flash and time.monotonic() < _flash[1]:
+            return _flash[0]
+        return None

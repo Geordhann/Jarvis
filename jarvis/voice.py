@@ -9,6 +9,18 @@ import threading
 
 from . import effects, state, tts
 
+_main: "Voice | None" = None
+
+
+def main() -> "Voice | None":
+    """La voix de Jarvis sur le PC (pour les outils qui le font parler autrement)."""
+    return _main
+
+
+def register_main(voice: "Voice") -> None:
+    global _main
+    _main = voice
+
 
 class Voice:
     """Deux threads : l'un prépare l'audio de la phrase suivante pendant que l'autre joue
@@ -26,12 +38,13 @@ class Voice:
         threading.Thread(target=self._synth_loop, daemon=True).start()
         threading.Thread(target=self._play_loop, daemon=True).start()
 
-    def say(self, text: str) -> None:
+    def say(self, text: str, lang: str | None = None, discord: bool = False) -> None:
+        """`lang` : autre langue (traducteur) ; `discord` : aussi dans le câble audio pour Discord."""
         if self.stopped:
             return  # interrompu : on ignore la suite de la réponse
         print(f"JARVIS › {text}", flush=True)
         if not self.muted:
-            self._texts.put((self._generation, text))
+            self._texts.put((self._generation, (text, lang, discord)))
 
     def stop(self) -> None:
         """Se tait tout de suite. Ne touche pas au son ici (appelé depuis un autre fil) :
@@ -54,21 +67,21 @@ class Voice:
 
     def _synth_loop(self) -> None:
         while True:
-            generation, text = self._texts.get()
+            generation, (text, lang, discord) = self._texts.get()
             if generation != self._generation:
                 self._texts.task_done()
                 continue
             try:
-                audio, ext = effects.apply(tts.synthesize(text, self.voice))
+                audio, ext = effects.apply(tts.synthesize(text, self.voice, lang))
             except Exception as exc:
                 print(f"[voix] synthèse impossible ({exc}), voix hors-ligne.")
                 audio, ext = None, "mp3"
-            self._audio.put((generation, text, audio, ext))
+            self._audio.put((generation, text, audio, ext, discord))
             self._texts.task_done()
 
     def _play_loop(self) -> None:
         while True:
-            generation, text, audio, ext = self._audio.get()
+            generation, text, audio, ext, discord = self._audio.get()
             if generation != self._generation:
                 self._audio.task_done()
                 if self._audio.empty() and self._texts.empty():
@@ -77,7 +90,7 @@ class Voice:
             state.set(state.SPEAKING, text)
             try:
                 if audio:
-                    self._play(audio, ext)
+                    self._play(audio, ext, discord)
                 else:
                     self._speak_offline(text)
             except Exception as exc:  # la voix ne doit jamais faire planter Jarvis
@@ -87,7 +100,7 @@ class Voice:
                 if self._audio.empty() and self._texts.empty():
                     state.set(state.IDLE)
 
-    def _play(self, audio: bytes, ext: str = "mp3") -> None:
+    def _play(self, audio: bytes, ext: str = "mp3", discord: bool = False) -> None:
         import pygame
 
         from .audio_out import ensure_mixer
@@ -98,11 +111,19 @@ class Voice:
             with os.fdopen(fd, "wb") as f:
                 f.write(audio)
             pygame.mixer.music.load(path)
+            if discord:
+                from . import discord_out
+
+                discord_out.play(audio)  # même phrase, en même temps, dans le micro Discord
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy() and not self.stopped:
                 pygame.time.wait(30)
             pygame.mixer.music.stop()
             pygame.mixer.music.unload()
+            if discord and self.stopped:
+                from . import discord_out
+
+                discord_out.stop()
         finally:
             os.remove(path)
 
