@@ -63,7 +63,8 @@ Pour ces tâches, lis d'abord la fiche avec l'outil lire_skill, puis suis-la :
 {tools_note}
 Tu peux chercher sur le web et lire des pages (web_search, web_fetch), ouvrir des pages et des
 applications et dossiers, contrôler les applications et fenêtres (basculer, réduire, fermer,
-raccourcis clavier, taper du texte), lancer de la musique et la contrôler (pause, suivant, volume), tenir un carnet
+raccourcis clavier, taper du texte), lancer des jeux Steam, résumer la page ou la vidéo ouverte
+(contenu_onglet_actif), lancer de la musique et la contrôler (pause, suivant, volume), tenir un carnet
 de notes, programmer des rappels et minuteurs, donner la météo, lire ou remplir le presse-papiers,
 connaître l'état du PC, le verrouiller ou l'éteindre, et regarder l'écran quand on te le demande.
 {messages_note}

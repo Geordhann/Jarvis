@@ -56,6 +56,7 @@ SENSITIVITY_RE = re.compile(r"\b(plus|moins) sensible\b|\b(augmente|monte|baisse
 VOICE_DEMO_RE = re.compile(r"\b(fais(?:-moi)? (?:ecouter|entendre)|presente(?:-moi)?|teste|essaie) (?:les |tes )?voix\b")
 CLARITY_RE = re.compile(r"\bvoix (plus |moins )?(claire|nette|sombre|etouffee)\b|\bmoins etouffee?\b")
 LOUDNESS_RE = re.compile(r"\bparle (plus|moins) fort\b|\b(augmente|monte|baisse|diminue) (?:le volume de )?ta voix\b")
+GAME_RE = re.compile(r"^(?:lance|demarre|ouvre|joue a|lance le jeu|mets le jeu)(?:-moi)?\s+(?:le jeu\s+)?(.+)$")
 ANNOUNCE_ON_RE = re.compile(r"\b(active|reactive|remets) les annonces\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
 
@@ -221,6 +222,8 @@ class Jarvis:
             config.save("effet", name)
             self.voice.say("Effet activé. Comment me trouvez-vous ?" if effect else "Voix normale rétablie.")
             return True
+        if self._handle_game(plain):
+            return True
         if self._handle_voice(request, plain) or self._handle_media(request, plain):
             return True
         if ORB_HIDE_RE.search(plain) or ORB_SHOW_RE.search(plain):
@@ -287,6 +290,20 @@ class Jarvis:
             self.voice.wait()
         self.voice.voice = current
         self.voice.say("C'était la dernière. Laquelle voulez-vous ?")
+
+    def _handle_game(self, plain: str) -> bool:
+        """« Lance Rocket League » : démarre directement un jeu Steam installé, sans appeler Claude."""
+        match = GAME_RE.match(plain.strip(" .!?"))
+        if not match or re.search(r"\b(musique|chanson|morceau|playlist)\b", plain):
+            return False
+        from .tools.games import find_game, lancer_jeu
+
+        found = find_game(match.group(1))
+        if not found:
+            return False  # pas un jeu : on laisse Claude décider (ouvrir une appli…)
+        lancer_jeu(found[0])
+        self.voice.say(f"Lancement de {found[0]}. Bon jeu, {self.title}.")
+        return True
 
     def _handle_media(self, request: str, plain: str) -> bool:
         clean = plain.strip(" .!?")
