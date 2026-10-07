@@ -22,7 +22,11 @@ PRESETS = {
 # PowerPitch, mix du Robotifier, Hauteur. Valeurs de la chaîne « (Copy) Tactical Droid ».
 DEFAULT_PERSO = (73, 100, 13)
 SEMITONES_PER_HALF = 12   # bouton à 0 ou 100 = une octave plus bas ou plus haut
-ROBOT_HZ = 100            # note du bourdonnement robotique (avant la dernière transposition)
+# Mesuré sur un enregistrement de la voix Voicemod de l'utilisateur : bourdonnement fixe à 120 Hz,
+# son très sombre (presque toute l'énergie sous 600 Hz).
+BUZZ_HZ = 120             # note finale du bourdonnement robotique
+DARK_CUTOFF_HZ = 550      # au-delà, le son est fortement atténué
+BASS_BOOST_DB = 5         # graves renforcés autour du bourdonnement
 
 
 def current() -> str:
@@ -54,7 +58,7 @@ def _knob_to_semitones(value: float) -> float:
     return (value - 50) / 50 * SEMITONES_PER_HALF
 
 
-def _robotize(audio, sample_rate: int, mix: float, freq: float = ROBOT_HZ):
+def _robotize(audio, sample_rate: int, mix: float, freq: float):
     """Robotifier : supprime la phase de chaque petit bloc de son → voix monocorde et bourdonnante."""
     import numpy as np
 
@@ -79,13 +83,27 @@ def _robotize(audio, sample_rate: int, mix: float, freq: float = ROBOT_HZ):
 
 
 def _perso(audio, sample_rate: int):
-    from pedalboard import Compressor, Gain, HighpassFilter, Pedalboard, PitchShift
+    from pedalboard import (Compressor, Gain, HighpassFilter, LadderFilter, LowShelfFilter, Pedalboard,
+                            PitchShift)
 
     power_pitch, robot_mix, pitch = perso_settings()
+    last_shift = _knob_to_semitones(pitch)
+    try:
+        buzz = float(config.get("effet_perso_bourdon") or BUZZ_HZ)
+    except ValueError:
+        buzz = BUZZ_HZ
     audio = Pedalboard([PitchShift(semitones=_knob_to_semitones(power_pitch))])(audio, sample_rate)
-    audio = _robotize(audio, sample_rate, mix=max(0.0, min(1.0, robot_mix / 100)))
-    return Pedalboard([PitchShift(semitones=_knob_to_semitones(pitch)), HighpassFilter(60),
-                       Compressor(threshold_db=-18, ratio=3), Gain(4)])(audio, sample_rate)
+    # Le bourdonnement est créé plus haut pour retomber exactement sur `buzz` après la dernière transposition.
+    audio = _robotize(audio, sample_rate, mix=max(0.0, min(1.0, robot_mix / 100)),
+                      freq=buzz / 2 ** (last_shift / 12))
+    return Pedalboard([
+        PitchShift(semitones=last_shift),
+        HighpassFilter(70),
+        LowShelfFilter(cutoff_frequency_hz=180, gain_db=BASS_BOOST_DB),
+        LadderFilter(mode=LadderFilter.Mode.LPF24, cutoff_hz=DARK_CUTOFF_HZ, resonance=0.15),
+        Compressor(threshold_db=-20, ratio=3),
+        Gain(8),
+    ])(audio, sample_rate)
 
 
 def _board(name: str):
