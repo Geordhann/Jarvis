@@ -39,8 +39,8 @@ CHANNELS = {
 }
 
 SYSTEM_PROMPT = """Tu es JARVIS, l'assistant personnel de ton utilisateur, inspiré du majordome IA d'Iron Man.
-Tu parles français. {personality} Tu es efficace : tu agis au lieu de demander quand
-l'intention est claire, et tu vas droit au but.
+Tu parles français, avec un ton poli, posé, légèrement pince-sans-rire. Tu es efficace : tu agis
+au lieu de demander quand l'intention est claire, et tu vas droit au but.
 
 # Ce que tu sais de ton utilisateur
 Voici le profil qu'il a écrit lui-même. Suis ses préférences.
@@ -63,8 +63,7 @@ Pour ces tâches, lis d'abord la fiche avec l'outil lire_skill, puis suis-la :
 {tools_note}
 Tu peux chercher sur le web et lire des pages (web_search, web_fetch), ouvrir des pages et des
 applications et dossiers, contrôler les applications et fenêtres (basculer, réduire, fermer,
-raccourcis clavier, taper du texte), lancer des jeux Steam, résumer la page ou la vidéo ouverte
-(contenu_onglet_actif), lancer de la musique et la contrôler (pause, suivant, volume), tenir un carnet
+raccourcis clavier, taper du texte), lancer de la musique et la contrôler (pause, suivant, volume), tenir un carnet
 de notes, programmer des rappels et minuteurs, donner la météo, lire ou remplir le presse-papiers,
 connaître l'état du PC, le verrouiller ou l'éteindre, et regarder l'écran quand on te le demande.
 {messages_note}
@@ -94,10 +93,6 @@ def french_time(t: datetime.datetime) -> str:
     if t.minute == 0:
         return f"{t.hour} heures" if t.hour > 1 else f"{t.hour} heure"
     return f"{t.hour} h {t.minute:02d}"
-
-
-class Interrupted(Exception):
-    """Levée par on_sentence quand l'utilisateur coupe Jarvis : on arrête de générer (et de payer)."""
 
 
 class SentenceSplitter:
@@ -150,10 +145,7 @@ class Agent:
             else "Les SMS ne sont pas configurés : si on te le demande, explique qu'il faut lancer "
                  "« python -m jarvis --configurer-sms »."
         ) + " Tu ne peux pas lire ses SMS reçus ni ses conversations WhatsApp ou Telegram."
-        from . import personalities
-
         self.system = SYSTEM_PROMPT.format(
-            personality=personalities.instructions(),
             messages_note=messages_note,
             profile=profile.read() or "(profil vide)",
             skills=skills.catalog(self.skills) or "(aucune)",
@@ -203,14 +195,6 @@ class Agent:
             return self._ask(text, on_sentence or (lambda s: None), on_tool or (lambda n: None))
 
     def _ask(self, text: str, on_sentence, on_tool) -> str:
-        start = len(self.messages)
-        try:
-            return self._ask_inner(text, on_sentence, on_tool)
-        except Interrupted:
-            del self.messages[start:]  # tour abandonné : la conversation reste valide
-            return ""
-
-    def _ask_inner(self, text: str, on_sentence, on_tool) -> str:
         ready = repliques.find(text)
         if ready:  # réplique prête : instantané, sans appeler Claude
             on_sentence(ready)

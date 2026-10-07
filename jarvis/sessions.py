@@ -31,11 +31,3 @@ def reset(key: str) -> None:
     with _lock:
         if key in _agents:
             _agents[key][0].reset()
-
-
-def reload_all() -> None:
-    """Après un changement de personnalité : nouvelles conversations avec le nouveau caractère."""
-    with _lock:
-        for agent, _ in _agents.values():
-            agent.reset()
-            agent.reload()

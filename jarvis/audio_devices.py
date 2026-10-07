@@ -49,19 +49,9 @@ def output_device() -> str | None:
     return found
 
 
-_input_cache: dict[str, int | None] = {}
-
-
 def input_index() -> int | None:
-    """Numéro du micro choisi (None = micro par défaut de Windows). Calculé une seule fois :
-    lister les micros ouvre/ferme PortAudio, à éviter pendant qu'un flux est ouvert."""
-    wanted = config.get("micro") or ""
-    if wanted not in _input_cache:
-        _input_cache[wanted] = _find_input(wanted)
-    return _input_cache[wanted]
-
-
-def _find_input(wanted: str) -> int | None:
+    """Numéro du micro choisi (None = micro par défaut de Windows)."""
+    wanted = config.get("micro")
     if not wanted:
         return None
     names = input_names()

@@ -6,7 +6,6 @@ import os
 import queue
 import tempfile
 import threading
-import time
 
 from . import effects, state, tts
 
@@ -18,33 +17,16 @@ class Voice:
     def __init__(self, voice: str | None = None, muted: bool = False):
         self.voice = voice  # prénom ou identifiant ; None = voix enregistrée / par défaut
         self.muted = muted
-        self._texts: queue.Queue[tuple[int, str]] = queue.Queue()
-        self._audio: queue.Queue[tuple[int, str, bytes | None, str]] = queue.Queue()
-        # Chaque interruption change de « génération » : tout ce qui est plus ancien est jeté.
-        self._generation = 0
-        self.stopped = False
+        self._texts: queue.Queue[str] = queue.Queue()
+        self._audio: queue.Queue[tuple[str, bytes | None, str]] = queue.Queue()
         self._engine = None
         threading.Thread(target=self._synth_loop, daemon=True).start()
         threading.Thread(target=self._play_loop, daemon=True).start()
 
     def say(self, text: str) -> None:
-        if self.stopped:
-            return  # interrompu : on ignore la suite de la réponse
         print(f"JARVIS › {text}", flush=True)
         if not self.muted:
-            self._texts.put((self._generation, text))
-
-    def stop(self) -> None:
-        """Coupe la parole immédiatement et jette les phrases en attente."""
-        # Appelé depuis d'autres threads (boule, raccourci, écoute) : on ne touche pas au son ici,
-        # c'est le thread de lecture qui voit « stopped » et coupe (pygame n'aime pas le multi-thread).
-        self.stopped = True
-        self._generation += 1
-        state.set(state.IDLE)
-
-    def resume(self) -> None:
-        """À appeler avant une nouvelle demande : Jarvis peut de nouveau parler."""
-        self.stopped = False
+            self._texts.put(text)
 
     def wait(self) -> None:
         """Bloque jusqu'à ce que tout ce qui est en file ait été prononcé."""
@@ -53,24 +35,18 @@ class Voice:
 
     def _synth_loop(self) -> None:
         while True:
-            generation, text = self._texts.get()
-            if generation != self._generation:
-                self._texts.task_done()
-                continue
+            text = self._texts.get()
             try:
                 audio, ext = effects.apply(tts.synthesize(text, self.voice))
             except Exception as exc:
                 print(f"[voix] synthèse impossible ({exc}), voix hors-ligne.")
                 audio, ext = None, "mp3"
-            self._audio.put((generation, text, audio, ext))
+            self._audio.put((text, audio, ext))
             self._texts.task_done()
 
     def _play_loop(self) -> None:
         while True:
-            generation, text, audio, ext = self._audio.get()
-            if generation != self._generation or self.stopped:
-                self._audio.task_done()
-                continue
+            text, audio, ext = self._audio.get()
             state.set(state.SPEAKING, text)
             try:
                 if audio:
@@ -87,24 +63,18 @@ class Voice:
     def _play(self, audio: bytes, ext: str = "mp3") -> None:
         import pygame
 
-        from .audio_out import MIXER_LOCK, ensure_mixer
+        from .audio_out import ensure_mixer
 
         ensure_mixer()  # sortie son partagée avec la musique de démarrage
         fd, path = tempfile.mkstemp(suffix=f".{ext}")
         try:
             with os.fdopen(fd, "wb") as f:
                 f.write(audio)
-            with MIXER_LOCK:
-                pygame.mixer.music.load(path)
-                pygame.mixer.music.play()
-            while not self.stopped:
-                with MIXER_LOCK:
-                    if not pygame.mixer.music.get_busy():
-                        break
-                time.sleep(0.03)
-            with MIXER_LOCK:
-                pygame.mixer.music.stop()
-                pygame.mixer.music.unload()
+            pygame.mixer.music.load(path)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy():
+                pygame.time.wait(50)
+            pygame.mixer.music.unload()
         finally:
             os.remove(path)
 

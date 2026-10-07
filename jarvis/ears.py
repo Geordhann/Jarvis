@@ -6,8 +6,6 @@ python -m jarvis --sensibilite-micro 8, ou « Jarvis, sois plus sensible ».
 
 from __future__ import annotations
 
-import threading
-
 from . import config
 
 DEFAULT_SENSITIVITY = 7
@@ -18,12 +16,6 @@ def sensitivity() -> int:
         return max(1, min(10, int(config.get("sensibilite_micro") or DEFAULT_SENSITIVITY)))
     except ValueError:
         return DEFAULT_SENSITIVITY
-
-
-# Un seul accès au micro à la fois : sous Windows, deux flux PortAudio ouverts/fermés en même temps
-# depuis deux threads (écoute + interruption) font planter Python (erreur « mémoire ne peut pas être read »).
-MIC_LOCK = threading.RLock()
-_whisper_lock = threading.Lock()
 
 
 class Ears:
@@ -42,7 +34,7 @@ class Ears:
         self.recognizer.non_speaking_duration = 0.5
         self.recognizer.phrase_threshold = 0.2
         self.microphone = sr.Microphone(device_index=input_index())
-        with MIC_LOCK, self.microphone as source:
+        with self.microphone as source:
             print("Calibrage du micro, silence s'il vous plaît…")
             self.recognizer.adjust_for_ambient_noise(source, duration=1.5)
         self.ambient = self.recognizer.energy_threshold
@@ -58,13 +50,17 @@ class Ears:
         self.recognizer.dynamic_energy_adjustment_ratio = 1.1 + 0.08 * (10 - level)
         print(f"[micro] sensibilité {level}/10 (seuil {self.recognizer.energy_threshold:.0f})")
 
-    # --- reconnaissance -------------------------------------------------------
+    def listen(self, timeout: float | None = None) -> str | None:
+        """Écoute une phrase et renvoie le texte reconnu (ou None si rien compris).
 
-    def transcribe(self, audio) -> str | None:
-        """Texte d'un enregistrement (sr.AudioData) : Whisper sur le PC, ou Google (par défaut)."""
-        if recognition_engine() == "whisper":
-            return whisper_transcribe(audio)
+        `timeout` : secondes d'attente maximum avant que quelqu'un commence à parler.
+        """
         sr = self.sr
+        with self.microphone as source:
+            try:
+                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=20)
+            except sr.WaitTimeoutError:
+                return None
         try:
             return self.recognizer.recognize_google(audio, language=self.language)
         except sr.UnknownValueError:
@@ -72,185 +68,6 @@ class Ears:
         except sr.RequestError as exc:
             print(f"[écoute] service de reconnaissance indisponible : {exc}")
             return None
-
-    def listen(self, timeout: float | None = None, phrase_limit: float = 20) -> str | None:
-        """Écoute une phrase et renvoie le texte reconnu (ou None si rien compris).
-
-        `timeout` : secondes d'attente maximum avant que quelqu'un commence à parler.
-        """
-        sr = self.sr
-        with MIC_LOCK, self.microphone as source:
-            try:
-                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_limit)
-            except sr.WaitTimeoutError:
-                return None
-        return self.transcribe(audio)
-
-    def listen_short(self) -> str | None:
-        """Écoute brève pendant que Jarvis parle (pour l'interrompre), si le micro est libre."""
-        sr = self.sr
-        if not MIC_LOCK.acquire(timeout=0.3):
-            return None  # le micro est déjà utilisé par l'écoute principale
-        try:
-            with self.microphone as source:
-                try:
-                    audio = self.recognizer.listen(source, timeout=1.5, phrase_time_limit=3)
-                except sr.WaitTimeoutError:
-                    return None
-        finally:
-            MIC_LOCK.release()
-        return self.transcribe(audio)
-
-    # --- mot d'éveil local (« Hey Jarvis ») ------------------------------------
-
-    def wake_and_listen(self, should_wake=lambda: False) -> str | None:
-        """Attend « Hey Jarvis » (détecté sur le PC), puis enregistre la demande qui suit, sans en
-        perdre le début : on continue de lire le même flux audio. `should_wake()` permet de se
-        réveiller autrement (clic sur la boule)."""
-        import numpy as np
-
-        from . import sounds
-
-        detector = wake_detector()
-        MIC_LOCK.acquire()
-        stream = None
-        try:
-            stream = self._wake_stream()
-            detector.reset()
-            while True:
-                chunk = np.frombuffer(stream.read(WAKE_CHUNK, exception_on_overflow=False), dtype=np.int16)
-                if should_wake():
-                    break
-                if max(detector.predict(chunk).values()) >= wake_threshold():
-                    break
-            sounds.play("ecoute")
-            frames = self._record_request(stream)
-        finally:
-            if stream is not None:
-                stream.stop_stream()
-                stream.close()
-            MIC_LOCK.release()
-        if not frames:
-            return ""
-        audio = self.sr.AudioData(b"".join(frames), WAKE_RATE, 2)
-        return self.transcribe(audio) or ""
-
-    def wake_during(self, condition) -> bool:
-        """Écoute « Hey Jarvis » tant que `condition()` est vraie (pendant que Jarvis parle)."""
-        import numpy as np
-
-        detector = wake_detector()
-        if not MIC_LOCK.acquire(timeout=0.3):
-            return False
-        stream = None
-        try:
-            stream = self._wake_stream()
-            detector.reset()
-            while condition():
-                chunk = np.frombuffer(stream.read(WAKE_CHUNK, exception_on_overflow=False), dtype=np.int16)
-                if max(detector.predict(chunk).values()) >= wake_threshold():
-                    return True
-            return False
-        finally:
-            if stream is not None:
-                stream.stop_stream()
-                stream.close()
-            MIC_LOCK.release()
-
-    def _wake_stream(self):
-        import pyaudio
-
-        from .audio_devices import input_index
-
-        if not hasattr(self, "_pyaudio"):
-            self._pyaudio = pyaudio.PyAudio()
-        return self._pyaudio.open(format=pyaudio.paInt16, channels=1, rate=WAKE_RATE, input=True,
-                                  input_device_index=input_index(), frames_per_buffer=WAKE_CHUNK)
-
-    def _record_request(self, stream) -> list[bytes]:
-        """Enregistre jusqu'à un silence d'environ 1 s (ou 15 s max ; rien si personne ne parle en 5 s)."""
-        import numpy as np
-
-        threshold = self.recognizer.energy_threshold
-        frames, started, silent, waited = [], False, 0.0, 0.0
-        step = WAKE_CHUNK / WAKE_RATE
-        while waited < 15:
-            data = stream.read(WAKE_CHUNK, exception_on_overflow=False)
-            level = float(np.sqrt(np.mean(np.frombuffer(data, dtype=np.int16).astype(np.float32) ** 2)))
-            waited += step
-            frames.append(data)
-            if level > threshold:
-                started, silent = True, 0.0
-            elif started:
-                silent += step
-                if silent >= self.recognizer.pause_threshold:
-                    break
-            elif waited > 5:
-                return []
-        return frames
-
-
-WAKE_RATE = 16000
-WAKE_CHUNK = 1280  # 80 ms, la taille attendue par openWakeWord
-_whisper = None
-_detector = None
-
-
-def recognition_engine() -> str:
-    return (config.get("reconnaissance") or "google").lower()
-
-
-def local_wake_enabled() -> bool:
-    return (config.get("eveil_local") or "non").lower() == "oui"
-
-
-def wake_threshold() -> float:
-    try:
-        return max(0.1, min(0.95, float(config.get("seuil_eveil") or 0.5)))
-    except ValueError:
-        return 0.5
-
-
-def wake_detector():
-    """Modèle openWakeWord « hey_jarvis » (téléchargé une seule fois, ~1 Mo)."""
-    global _detector
-    if _detector is None:
-        import openwakeword
-        from openwakeword.model import Model
-
-        openwakeword.utils.download_models(["hey_jarvis"])
-        _detector = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
-    return _detector
-
-
-WHISPER_HALLUCINATIONS = ("sous-titres", "sous titres", "amara.org", "merci d'avoir regardé",
-                          "abonnez-vous", "radio-canada")
-
-
-def whisper_transcribe(audio) -> str | None:
-    """Reconnaissance Whisper sur le PC : précise, sans Internet, la voix ne sort pas de chez toi."""
-    with _whisper_lock:  # un seul calcul Whisper à la fois
-        return _whisper_transcribe(audio)
-
-
-def _whisper_transcribe(audio) -> str | None:
-    global _whisper
-    import numpy as np
-
-    if _whisper is None:
-        from faster_whisper import WhisperModel
-
-        size = config.get("whisper_modele") or "small"
-        print(f"[écoute] chargement de Whisper « {size} » (téléchargé une seule fois)…")
-        _whisper = WhisperModel(size, device="auto", compute_type="int8")
-    raw = audio.get_raw_data(convert_rate=16000, convert_width=2)
-    samples = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768
-    segments, _ = _whisper.transcribe(samples, language="fr", beam_size=1, vad_filter=True,
-                                      initial_prompt="Jarvis, assistant vocal.")
-    text = " ".join(segment.text.strip() for segment in segments).strip()
-    if not text or any(h in text.lower() for h in WHISPER_HALLUCINATIONS):
-        return None  # Whisper « invente » parfois ces phrases sur du silence
-    return text
 
 
 def test_microphone() -> None:

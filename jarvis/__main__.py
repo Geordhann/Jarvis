@@ -13,7 +13,7 @@ import unicodedata
 
 import anthropic
 
-from . import announcer, autostart, config, orb, reminders, sounds, startup_music, state, profile, repliques, services, sessions, voices
+from . import announcer, autostart, config, orb, reminders, startup_music, state, profile, repliques, services, sessions, voices
 from .agent import MODELS, french_date, french_time
 from .tools import ToolFailure, media
 from .voice import Voice
@@ -56,11 +56,6 @@ SENSITIVITY_RE = re.compile(r"\b(plus|moins) sensible\b|\b(augmente|monte|baisse
 VOICE_DEMO_RE = re.compile(r"\b(fais(?:-moi)? (?:ecouter|entendre)|presente(?:-moi)?|teste|essaie) (?:les |tes )?voix\b")
 CLARITY_RE = re.compile(r"\bvoix (plus |moins )?(claire|nette|sombre|etouffee)\b|\bmoins etouffee?\b")
 LOUDNESS_RE = re.compile(r"\bparle (plus|moins) fort\b|\b(augmente|monte|baisse|diminue) (?:le volume de )?ta voix\b")
-GAME_RE = re.compile(r"^(?:lance|demarre|ouvre|joue a|lance le jeu|mets le jeu)(?:-moi)?\s+(?:le jeu\s+)?(.+)$")
-PERSONALITY_RE = re.compile(r"\b(?:mode|personnalite|sois|deviens|caractere)\s+(classique|normale?|sarcastique|ironique|"
-                            r"serieux|serieuse|motivant|coach|drole|marrant|comique|majordome)\b")
-INTERRUPT_RE = re.compile(r"\b(stop|stoppe|tais[- ]toi|silence|chut|arrete|ca suffit|jarvis)\b")
-SOUNDS_RE = re.compile(r"\b(coupe|desactive|arrete|active|remets|reactive) (?:les )?(bruitages|bips|sons)\b")
 ANNOUNCE_ON_RE = re.compile(r"\b(active|reactive|remets) les annonces\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
 
@@ -90,9 +85,6 @@ class Jarvis:
         self.voice = Voice(voice=args.voix, muted=args.muet)
         self.ears = None if args.texte else _init_ears(retry=args.fond)
         self.awake_until = 0.0
-        state.on_stop(self.interrupt)
-        if self.ears is not None and (config.get("interruption") or "oui") != "non":
-            threading.Thread(target=self._interrupt_loop, daemon=True, name="interruption").start()
 
     @property
     def agent(self):
@@ -107,9 +99,6 @@ class Jarvis:
         # Musique d'entrée seulement si l'utilisateur l'a activée (--musique-au-lancement oui).
         if not self.voice.muted and config.get("musique_au_lancement") == "oui" and startup_music.play():
             time.sleep(4)  # quelques secondes d'intro avant de saluer
-        elif not self.voice.muted and sounds.enabled():
-            sounds.play("demarrage")
-            time.sleep(1.4)
         self.voice.say(f"Bonjour {self.title}. Tous les systèmes sont opérationnels.")
         self.voice.wait()
 
@@ -129,8 +118,6 @@ class Jarvis:
                 self._done_speaking()
                 continue
 
-            sounds.play("fin")
-            self.voice.resume()
             if not self.handle(request):
                 break
             self._done_speaking()
@@ -141,13 +128,6 @@ class Jarvis:
         if self.ears is None:
             return input("VOUS › ")
         awake = time.monotonic() < max(self.awake_until, state.awake_until())
-        if not awake and not self.always_listen and _local_wake():
-            # Mot d'éveil détecté sur le PC : rien n'est envoyé tant que « Hey Jarvis » n'est pas dit.
-            print("… en veille (dites « Hey Jarvis »)")
-            state.set(state.IDLE)
-            text = self.ears.wake_and_listen(should_wake=lambda: time.monotonic() < state.awake_until())
-            print(f"VOUS › {text}" if text else "VOUS › (Jarvis)")
-            return f"Jarvis {text}"  # la suite du code voit « Jarvis … » comme avec Google
         print("… je vous écoute" if awake else "… en veille")
         state.set(state.LISTENING if awake else state.IDLE)
         text = self.ears.listen(timeout=FOLLOW_UP_SECONDS if awake else None)
@@ -169,43 +149,7 @@ class Jarvis:
         # On attend la fin de la parole pour ne pas s'entendre soi-même,
         # puis on ouvre une courte fenêtre pour enchaîner sans redire « Jarvis ».
         self.voice.wait()
-        self.voice.resume()
         self.awake_until = time.monotonic() + FOLLOW_UP_SECONDS
-
-    # --- interruption ----------------------------------------------------------
-
-    def interrupt(self) -> None:
-        """« Jarvis, stop », clic sur la boule ou Ctrl+Alt+S : il se tait et écoute."""
-        if state.get()[0] != state.SPEAKING and self.voice.stopped:
-            return
-        self.voice.stop()
-        sounds.play("stop")
-        state.wake()  # la phrase suivante est prise sans redire « Jarvis »
-        print("[interruption] Jarvis se tait.")
-
-    def _interrupt_loop(self) -> None:
-        """Pendant que Jarvis parle, on écoute en parallèle si on lui demande de se taire."""
-        while True:
-            current, caption, _ = state.get()
-            if current != state.SPEAKING or self.voice.stopped:
-                time.sleep(0.15)
-                continue
-            try:
-                if _local_wake():
-                    if self.ears.wake_during(lambda: state.get()[0] == state.SPEAKING):
-                        self.interrupt()
-                    continue
-                heard = self.ears.listen_short()
-            except Exception as exc:
-                print(f"[interruption] écoute impossible : {exc}")
-                time.sleep(2)
-                continue
-            if not heard:
-                continue
-            words = set(INTERRUPT_RE.findall(_plain(heard)))
-            # On ignore ce que Jarvis est lui-même en train de dire (le micro l'entend aussi).
-            if words and not words <= set(INTERRUPT_RE.findall(_plain(caption))):
-                self.interrupt()
 
     # --- commandes ---------------------------------------------------------
 
@@ -277,30 +221,7 @@ class Jarvis:
             config.save("effet", name)
             self.voice.say("Effet activé. Comment me trouvez-vous ?" if effect else "Voix normale rétablie.")
             return True
-        persona = PERSONALITY_RE.search(plain)
-        if persona:
-            from . import personalities
-
-            name = personalities.resolve(persona.group(1))
-            config.save("personnalite", name)
-            sessions.reload_all()
-            replies = {"classique": "Retour à la normale, {t}.",
-                       "sarcastique": "Mode sarcastique activé. Enfin un peu de piquant, {t}.",
-                       "serieux": "Mode sérieux activé.",
-                       "motivant": "Mode coach activé ! On va tout déchirer aujourd'hui, {t} !",
-                       "drole": "Mode humour activé. Accrochez-vous, {t}.",
-                       "majordome": "Fort bien, {t}. Je me tiens à votre entière disposition."}
-            self.voice.say(replies[name].format(t=self.title))
-            return True
-        if self._handle_game(plain):
-            return True
         if self._handle_voice(request, plain) or self._handle_media(request, plain):
-            return True
-        bips = SOUNDS_RE.search(plain)
-        if bips:
-            on = bips.group(1) in ("active", "remets", "reactive")
-            config.save("bruitages", "oui" if on else "non")
-            self.voice.say("Bruitages activés." if on else "Bruitages coupés.")
             return True
         if ORB_HIDE_RE.search(plain) or ORB_SHOW_RE.search(plain):
             hide = bool(ORB_HIDE_RE.search(plain))
@@ -367,20 +288,6 @@ class Jarvis:
         self.voice.voice = current
         self.voice.say("C'était la dernière. Laquelle voulez-vous ?")
 
-    def _handle_game(self, plain: str) -> bool:
-        """« Lance Rocket League » : démarre directement un jeu Steam installé, sans appeler Claude."""
-        match = GAME_RE.match(plain.strip(" .!?"))
-        if not match or re.search(r"\b(musique|chanson|morceau|playlist)\b", plain):
-            return False
-        from .tools.games import find_game, lancer_jeu
-
-        found = find_game(match.group(1))
-        if not found:
-            return False  # pas un jeu : on laisse Claude décider (ouvrir une appli…)
-        lancer_jeu(found[0])
-        self.voice.say(f"Lancement de {found[0]}. Bon jeu, {self.title}.")
-        return True
-
     def _handle_media(self, request: str, plain: str) -> bool:
         clean = plain.strip(" .!?")
         play = PLAY_RE.match(clean)
@@ -404,17 +311,9 @@ class Jarvis:
         return False
 
     def _ask_agent(self, request: str) -> None:
-        from .agent import Interrupted
-
         state.set(state.THINKING)
-
-        def speak(sentence: str) -> None:
-            if self.voice.stopped:
-                raise Interrupted  # on arrête la génération : inutile de payer la suite
-            self.voice.say(sentence)
-
         try:
-            self.agent.ask(request, on_sentence=speak)
+            self.agent.ask(request, on_sentence=self.voice.say)
         except anthropic.AuthenticationError:
             self.voice.say("Ma clé d'accès à Claude est invalide. Relancez la configuration.")
         except anthropic.RateLimitError:
@@ -424,12 +323,6 @@ class Jarvis:
             self.voice.say("Un problème est survenu avec mes serveurs.")
         except anthropic.APIConnectionError:
             self.voice.say("Je n'arrive pas à joindre mes serveurs. Vérifiez la connexion Internet.")
-
-
-def _local_wake() -> bool:
-    from .ears import local_wake_enabled
-
-    return local_wake_enabled()
 
 
 def _init_ears(retry: bool = False):
@@ -539,16 +432,6 @@ def main() -> None:
     run.add_argument("--voix", default=None, help="voix pour cette session (Daniel, Henri, Denise…)")
     run.add_argument("--enregistrer-voicemod", action="store_true",
                      help="enregistrer la même phrase avec et sans Voicemod, pour régler l'effet perso")
-    run.add_argument("--reconnaissance", choices=["google", "whisper"],
-                     help="reconnaissance vocale : google (Internet) ou whisper (sur le PC) ; mémorisé")
-    run.add_argument("--whisper-modele", choices=["tiny", "base", "small", "medium"],
-                     help="taille du modèle Whisper : base (rapide) à medium (précis), défaut small")
-    run.add_argument("--eveil-local", choices=["oui", "non"], help="détecter « Hey Jarvis » sur le PC (mémorisé)")
-    run.add_argument("--seuil-eveil", metavar="0.1-0.9", help="sensibilité du mot d'éveil local, défaut 0.5")
-    run.add_argument("--interruption", choices=["oui", "non"], help="pouvoir couper Jarvis à la voix (défaut oui)")
-    run.add_argument("--bruitages", choices=["oui", "non"], help="bips et sons Iron Man (défaut oui)")
-    run.add_argument("--personnalite", choices=["classique", "sarcastique", "serieux", "motivant", "drole", "majordome"],
-                     help="caractère de Jarvis (mémorisé)")
     run.add_argument("--effet-perso-clarte", metavar="HZ",
                      help="clarté de l'effet perso : 600 (très étouffé) à 8000 (très clair), défaut 3000 (mémorisé)")
     run.add_argument("--volume-voix", metavar="POURCENT", help="volume de la voix avec effet, 100 = normal, max 300 (mémorisé)")
@@ -581,12 +464,6 @@ def main() -> None:
         sys.stdout = sys.stderr = log
         args.texte = False
         print(f"\n=== Démarrage de Jarvis {datetime.datetime.now():%Y-%m-%d %H:%M} ===")
-    # Si Python plante « en dur » (erreur Windows « mémoire ne peut pas être read »), on note
-    # dans le journal (~/.jarvis.log) où il en était, pour pouvoir corriger.
-    if sys.stderr is not None:
-        import faulthandler
-
-        faulthandler.enable(file=sys.stderr, all_threads=True)
 
     # --- réglages ponctuels ------------------------------------------------
     one_shot = False
@@ -597,10 +474,7 @@ def main() -> None:
                       ("musique_demarrage", "musique_demarrage"), ("volume_fond", "musique_volume_fond"),
                       ("musique_au_lancement", "musique_au_lancement"), ("sensibilite_micro", "sensibilite_micro"),
                       ("effet_perso", "effet_perso"), ("effet_perso_clarte", "effet_perso_clarte"),
-                      ("volume_voix", "volume_voix"), ("personnalite", "personnalite"),
-                      ("reconnaissance", "reconnaissance"), ("whisper_modele", "whisper_modele"),
-                      ("eveil_local", "eveil_local"), ("seuil_eveil", "seuil_eveil"),
-                      ("interruption", "interruption"), ("bruitages", "bruitages")):
+                      ("volume_voix", "volume_voix")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
@@ -608,9 +482,7 @@ def main() -> None:
             one_shot = one_shot or flag not in ("modele", "effort", "effet", "vitesse_voix", "hauteur_voix",
                                                  "musique_demarrage", "volume_fond", "musique_au_lancement",
                                                  "sensibilite_micro", "effet_perso", "effet_perso_clarte",
-                                                 "volume_voix", "personnalite", "reconnaissance",
-                                                 "whisper_modele", "eveil_local", "seuil_eveil",
-                                                 "interruption", "bruitages")
+                                                 "volume_voix")
     for key in ("sortie_audio", "micro"):
         if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
             config.save(key, None)
@@ -624,7 +496,7 @@ def main() -> None:
     if args.configurer:
         from .setup_wizard import run as wizard
 
-        return wizard(choose_voice=choose_voice_menu)
+        return wizard()
     if args.profil:
         print(f"Profil ouvert : {profile.open_in_editor()}")
         return

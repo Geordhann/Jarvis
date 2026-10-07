@@ -26,4 +26,3 @@ Pillow
 pyperclip
 # Contrôle des fenêtres (Windows)
 pygetwindow; sys_platform == "win32"
-youtube-transcript-api

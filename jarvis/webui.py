@@ -1,4 +1,4 @@
-"""Serveur de l'interface de Jarvis : http://localhost:8765 (accessible uniquement depuis le PC)."""
+"""Serveur de l'interface de Jarvis : http://localhost:8765 (accessible depuis ton ordinateur seulement)."""
 
 from __future__ import annotations
 
@@ -25,8 +25,8 @@ async def start():
         if request.host not in ALLOWED_HOSTS:
             return web.Response(status=403, text="Accès refusé")
         if request.path.startswith("/api/"):
-            origin = (request.headers.get("Origin") or "").split("://", 1)[-1]
-            if request.headers.get("X-Jarvis") != "1" or (origin and origin not in ALLOWED_HOSTS):
+            origin = request.headers.get("Origin")
+            if request.headers.get("X-Jarvis") != "1" or (origin and origin.split("://", 1)[-1] not in ALLOWED_HOSTS):
                 return web.Response(status=403, text="Accès refusé")
         return await handler(request)
 
@@ -114,4 +114,3 @@ async def start():
     await web.TCPSite(runner, "127.0.0.1", PORT).start()
     print(f"[interface] ouverte sur http://localhost:{PORT}")
     return runner
-

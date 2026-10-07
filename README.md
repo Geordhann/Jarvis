@@ -32,19 +32,6 @@ cherche sur le web, ouvre des pages, se souvient de toi, et te répond avec une 
 
 ## 1. Installation
 
-### Windows : en un double-clic
-1. Dézippe le dossier, par exemple dans `Documents\jarvis`.
-2. Double-clique sur **`INSTALLER-JARVIS.bat`**.
-
-Il arrête l'ancien Jarvis, installe tout, te propose d'effacer les anciens réglages, puis te guide :
-clé Claude, haut-parleurs (avec test du son), micro, voix et effet, personnalité, options, Google,
-icône sur le Bureau et lancement au démarrage. Il faut Python (https://www.python.org/downloads/,
-case « Add python.exe to PATH » cochée).
-
-Pour lancer Jarvis : l'icône **Jarvis** du Bureau, ou **`LANCER-JARVIS.vbs`** dans le dossier
-(il remet l'icône sur le Bureau si elle n'y est pas).
-
-### À la main (Windows, macOS, Linux)
 Il faut Python 3.10 ou plus récent.
 
 ```bash
@@ -278,36 +265,6 @@ faire bannir ton compte). Jarvis passe donc par ton écran : « ouvre mes messag
 « regarde mon écran et résume mes messages », « réponds-lui que j'arrive » (il tape la réponse,
 c'est toi qui l'envoies).
 
-### Jeux Steam
-« Jarvis, lance Rocket League », « lance GTA 5 », « quels jeux j'ai ? » : Jarvis lit ta bibliothèque Steam
-(toutes tes bibliothèques) et comprend les noms approximatifs et les sigles.
-
-### Résumer ce qui est ouvert
-Avec une page ou une vidéo YouTube au premier plan : « Jarvis, résume cette vidéo », « de quoi parle cet
-article ? », « traduis cette page ». Il récupère le texte de la page ou les sous-titres de la vidéo.
-
-### Interrompre Jarvis
-Pendant qu'il parle : « **Jarvis, stop** » (ou « tais-toi », « chut »), **clic sur la boule**, ou
-**Ctrl+Alt+S**. Il se tait aussitôt, arrête de générer la réponse (tu ne la paies pas) et t'écoute.
-`python -m jarvis --interruption non` pour désactiver l'écoute pendant qu'il parle.
-
-### Écoute 100 % locale (optionnel, gratuit, privé)
-```powershell
-pip install -r requirements-local.txt          # ~300 Mo, une seule fois
-python -m jarvis --reconnaissance whisper       # Whisper : reconnaissance sur le PC, plus précise
-python -m jarvis --eveil-local oui              # « Hey Jarvis » détecté sur le PC
-```
-Avec le mot d'éveil local, rien n'est envoyé tant que tu n'as pas dit « **Hey Jarvis** » ; un bip te
-dit qu'il t'écoute, puis tu fais ta demande. Réglages : `--whisper-modele base` (plus rapide) ou `medium`
-(plus précis, PC puissant), `--seuil-eveil 0.3` (se réveille plus facilement) à `0.7` (plus strict).
-Le premier lancement télécharge les modèles (une seule fois).
-
-### Bruitages et personnalités
-- Bruitages Iron Man (démarrage du réacteur, bip d'écoute, bip « compris ») : « Jarvis, coupe les
-  bruitages » / « active les bruitages », ou `--bruitages non`.
-- Personnalités : « Jarvis, **mode sarcastique** » (le JARVIS des films, en plus mordant), « mode sérieux »,
-  « mode motivant », « mode drôle », « mode majordome », « mode classique ».
-
 ## 3. Utilisation
 
 ```bash
@@ -453,8 +410,6 @@ Fixe une limite de dépense mensuelle dans la console Anthropic.
 | `--musique-au-lancement oui/non`, `--musique-demarrage CHEMIN`, `--volume-fond POURCENT` | musique d'entrée (Thunderstruck…) |
 | `--tester-micro`, `--sensibilite-micro 1-10` | régler l'écoute du micro |
 | `--interface`, `--sans-micro`, `--texte`, `--muet`, `--toujours` | façons de l'utiliser |
-| `--reconnaissance google/whisper`, `--whisper-modele`, `--eveil-local oui/non`, `--seuil-eveil` | écoute locale |
-| `--interruption oui/non`, `--bruitages oui/non`, `--personnalite NOM` | comportement |
 | `--installer` | tout installer : icône Bureau + menu Démarrer, boule, lancement au démarrage |
 | `--raccourcis` | recréer seulement l'icône |
 | `--installer-demarrage`, `--retirer-demarrage` | lancement automatique |
