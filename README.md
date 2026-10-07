@@ -272,6 +272,10 @@ Pendant qu'il parle, dis **« stop »**, « tais-toi », « chut » ou « ça su
 il se tait tout de suite et t'écoute, sans avoir à redire « Jarvis ».
 Pour désactiver : `python -m jarvis --interruption non`.
 
+### Phrases longues
+Prends ton temps : dès que tu parles plus de 4 secondes, une petite pause pour réfléchir ne coupe
+plus ta phrase. Et si tu t'arrêtes sur « et », « pour », « parce que »…, Jarvis attend la suite.
+
 ```bash
 python -m jarvis --interface   # pareil, et ouvre l'interface dans le navigateur
 python -m jarvis --sans-micro  # sans écoute au micro (interface et messageries seulement)

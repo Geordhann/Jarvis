@@ -6,9 +6,26 @@ python -m jarvis --sensibilite-micro 8, ou « Jarvis, sois plus sensible ».
 
 from __future__ import annotations
 
+import re
+
 from . import config
 
 DEFAULT_SENSITIVITY = 7
+
+# Écoute des phrases longues : au-delà de LONG_PHRASE secondes de parole, une pause de moins de
+# LONG_PAUSE secondes ne termine plus la phrase (jusqu'à MAX_TOTAL secondes en tout).
+PHRASE_LIMIT = 30
+LONG_PHRASE = 4.0
+LONG_PAUSE = 1.5
+MAX_TOTAL = 120
+UNFINISHED_WAIT = 2.5
+ENDS_UNFINISHED_RE = re.compile(
+    r"\b(et|ou|mais|donc|alors|puis|ensuite|avec|pour|de|du|des|le|la|les|un|une|a|à|au|aux|en|dans|sur|"
+    r"que|qui|quand|si|comme|parce que|par exemple|genre|euh|ben)\s*$", re.IGNORECASE)
+
+
+def _seconds(audio) -> float:
+    return len(audio.frame_data) / (audio.sample_rate * audio.sample_width)
 
 
 def sensitivity() -> int:
@@ -58,9 +75,36 @@ class Ears:
         sr = self.sr
         with self.microphone as source:
             try:
-                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=20)
+                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=PHRASE_LIMIT)
             except sr.WaitTimeoutError:
                 return None
+            audio = self._continue_long(source, audio)
+        text = self._recognize(audio)
+        if text and ENDS_UNFINISHED_RE.search(text):
+            # Phrase qui finit par « et », « pour », « parce que »… : tu n'as pas fini, on écoute la suite.
+            with self.microphone as source:
+                try:
+                    more = self.recognizer.listen(source, timeout=UNFINISHED_WAIT, phrase_time_limit=PHRASE_LIMIT)
+                except sr.WaitTimeoutError:
+                    return text
+                more = self._continue_long(source, more)
+            text = f"{text} {self._recognize(more) or ''}".strip()
+        return text
+
+    def _continue_long(self, source, audio):
+        """Phrase longue : une pause pour réfléchir ne coupe pas, on écoute encore un peu et on
+        recolle les morceaux (une seule reconnaissance à la fin, plus précise)."""
+        sr = self.sr
+        while _seconds(audio) >= LONG_PHRASE and _seconds(audio) < MAX_TOTAL:
+            try:
+                more = self.recognizer.listen(source, timeout=LONG_PAUSE, phrase_time_limit=PHRASE_LIMIT)
+            except sr.WaitTimeoutError:
+                break
+            audio = sr.AudioData(audio.frame_data + more.frame_data, audio.sample_rate, audio.sample_width)
+        return audio
+
+    def _recognize(self, audio) -> str | None:
+        sr = self.sr
         try:
             return self.recognizer.recognize_google(audio, language=self.language)
         except sr.UnknownValueError:
