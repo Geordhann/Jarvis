@@ -25,8 +25,11 @@ SEMITONES_PER_HALF = 12   # bouton à 0 ou 100 = une octave plus bas ou plus hau
 # Mesuré sur un enregistrement de la voix Voicemod de l'utilisateur : bourdonnement fixe à 120 Hz,
 # son très sombre (presque toute l'énergie sous 600 Hz).
 BUZZ_HZ = 120             # note finale du bourdonnement robotique
-DARK_CUTOFF_HZ = 550      # au-delà, le son est fortement atténué
-BASS_BOOST_DB = 5         # graves renforcés autour du bourdonnement
+# Retour de l'utilisateur sur la 1re version (coupure à 550 Hz) : trop étouffée et trop faible.
+CLARITY_HZ = 3000         # coupure des aigus (plus haut = moins étouffé) ; --effet-perso-clarte
+BASS_DB = -2              # graves autour du bourdonnement (négatif = moins « boum »)
+PRESENCE_DB = 5           # présence vers 2 kHz : rend les mots plus nets
+TARGET_RMS = 0.22         # volume visé pendant la parole (normalisation)
 
 
 def current() -> str:
@@ -83,7 +86,7 @@ def _robotize(audio, sample_rate: int, mix: float, freq: float):
 
 
 def _perso(audio, sample_rate: int):
-    from pedalboard import (Compressor, Gain, HighpassFilter, LadderFilter, LowShelfFilter, Pedalboard,
+    from pedalboard import (Compressor, HighpassFilter, LadderFilter, LowShelfFilter, Pedalboard, PeakFilter,
                             PitchShift)
 
     power_pitch, robot_mix, pitch = perso_settings()
@@ -96,14 +99,36 @@ def _perso(audio, sample_rate: int):
     # Le bourdonnement est créé plus haut pour retomber exactement sur `buzz` après la dernière transposition.
     audio = _robotize(audio, sample_rate, mix=max(0.0, min(1.0, robot_mix / 100)),
                       freq=buzz / 2 ** (last_shift / 12))
-    return Pedalboard([
+    try:
+        clarity = float(config.get("effet_perso_clarte") or CLARITY_HZ)
+    except ValueError:
+        clarity = CLARITY_HZ
+    audio = Pedalboard([
         PitchShift(semitones=last_shift),
         HighpassFilter(70),
-        LowShelfFilter(cutoff_frequency_hz=180, gain_db=BASS_BOOST_DB),
-        LadderFilter(mode=LadderFilter.Mode.LPF24, cutoff_hz=DARK_CUTOFF_HZ, resonance=0.15),
-        Compressor(threshold_db=-20, ratio=3),
-        Gain(8),
+        LowShelfFilter(cutoff_frequency_hz=180, gain_db=BASS_DB),
+        PeakFilter(cutoff_frequency_hz=2000, gain_db=PRESENCE_DB, q=0.8),
+        LadderFilter(mode=LadderFilter.Mode.LPF12, cutoff_hz=clarity, resonance=0.1),
+        Compressor(threshold_db=-22, ratio=3, attack_ms=5, release_ms=80),
     ])(audio, sample_rate)
+    return audio
+
+
+def _loud(audio, sample_rate: int):
+    """Monte le volume pendant la parole jusqu'à TARGET_RMS (× --volume-voix), sans saturer."""
+    import numpy as np
+    from pedalboard import Limiter, Pedalboard
+
+    try:
+        boost = max(0.2, min(3.0, float(config.get("volume_voix") or 100) / 100))
+    except ValueError:
+        boost = 1.0
+    speech = audio[np.abs(audio) > 0.05 * (np.abs(audio).max() or 1)]
+    rms = float(np.sqrt(np.mean(speech ** 2))) if speech.size else 0.0
+    if rms > 1e-6:
+        audio = audio * min(20.0, TARGET_RMS * boost / rms)
+    audio = Pedalboard([Limiter(threshold_db=-1.0, release_ms=60)])(audio.astype(np.float32), sample_rate)
+    return np.clip(audio, -1.0, 1.0)
 
 
 def _board(name: str):
@@ -148,7 +173,7 @@ def apply(mp3: bytes, name: str | None = None) -> tuple[bytes, str]:
                 audio = _ring_mod(audio, sample_rate, *ring)
             if board is not None:
                 audio = board(audio, sample_rate)
-        audio = np.clip(audio, -1.0, 1.0)
+        audio = _loud(audio, sample_rate)
         out = io.BytesIO()
         with AudioFile(out, "w", sample_rate, audio.shape[0], format="wav") as f:
             f.write(audio)

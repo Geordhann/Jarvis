@@ -54,6 +54,8 @@ PITCH_RE = re.compile(r"\bvoix (plus )?(grave|aigue|basse|haute)\b")
 INTRO_MUSIC_RE = re.compile(r"\b(musique d'entree|ta musique|entree en scene|thunderstruck|mode iron man)\b")
 SENSITIVITY_RE = re.compile(r"\b(plus|moins) sensible\b|\b(augmente|monte|baisse|diminue) (?:la )?sensibilite\b")
 VOICE_DEMO_RE = re.compile(r"\b(fais(?:-moi)? (?:ecouter|entendre)|presente(?:-moi)?|teste|essaie) (?:les |tes )?voix\b")
+CLARITY_RE = re.compile(r"\bvoix (plus |moins )?(claire|nette|sombre|etouffee)\b|\bmoins etouffee?\b")
+LOUDNESS_RE = re.compile(r"\bparle (plus|moins) fort\b|\b(augmente|monte|baisse|diminue) (?:le volume de )?ta voix\b")
 ANNOUNCE_ON_RE = re.compile(r"\b(active|reactive|remets) les annonces\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
 
@@ -183,6 +185,23 @@ class Jarvis:
             if self.ears is not None:
                 self.ears.apply_sensitivity()
             self.voice.say(f"Sensibilité du micro réglée sur {level} sur 10.")
+            return True
+        clarity = CLARITY_RE.search(plain)
+        if clarity:
+            words = clarity.group(0)
+            brighter = ("claire" in words or "nette" in words or "moins etouff" in words) and "moins claire" not in words
+            from .effects import CLARITY_HZ
+
+            value = float(config.get("effet_perso_clarte") or CLARITY_HZ) + (600 if brighter else -600)
+            config.save("effet_perso_clarte", str(int(max(600, min(8000, value)))))
+            self.voice.say("Comme ceci ?")
+            return True
+        loud = LOUDNESS_RE.search(plain)
+        if loud:
+            up = (loud.group(1) or loud.group(2)) in ("plus", "augmente", "monte")
+            value = float(config.get("volume_voix") or 100) + (25 if up else -25)
+            config.save("volume_voix", str(int(max(20, min(300, value)))))
+            self.voice.say("Comme ceci ?")
             return True
         speed, tone = SPEED_RE.search(plain), PITCH_RE.search(plain)
         if speed or tone:
@@ -413,6 +432,9 @@ def main() -> None:
     run.add_argument("--voix", default=None, help="voix pour cette session (Daniel, Henri, Denise…)")
     run.add_argument("--enregistrer-voicemod", action="store_true",
                      help="enregistrer la même phrase avec et sans Voicemod, pour régler l'effet perso")
+    run.add_argument("--effet-perso-clarte", metavar="HZ",
+                     help="clarté de l'effet perso : 600 (très étouffé) à 8000 (très clair), défaut 3000 (mémorisé)")
+    run.add_argument("--volume-voix", metavar="POURCENT", help="volume de la voix avec effet, 100 = normal, max 300 (mémorisé)")
     run.add_argument("--effet-perso", metavar="POWERPITCH,ROBOT,HAUTEUR",
                      help="réglages de l'effet perso, comme les boutons Voicemod, ex. 73,100,13 (mémorisé)")
     run.add_argument("--effet", choices=["aucun", "ia", "droide", "tactique", "robot", "perso"],
@@ -451,14 +473,16 @@ def main() -> None:
                       ("vitesse_voix", "vitesse_voix"), ("hauteur_voix", "hauteur_voix"),
                       ("musique_demarrage", "musique_demarrage"), ("volume_fond", "musique_volume_fond"),
                       ("musique_au_lancement", "musique_au_lancement"), ("sensibilite_micro", "sensibilite_micro"),
-                      ("effet_perso", "effet_perso")):
+                      ("effet_perso", "effet_perso"), ("effet_perso_clarte", "effet_perso_clarte"),
+                      ("volume_voix", "volume_voix")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
             print(f"Réglage « {key} » enregistré.")
             one_shot = one_shot or flag not in ("modele", "effort", "effet", "vitesse_voix", "hauteur_voix",
                                                  "musique_demarrage", "volume_fond", "musique_au_lancement",
-                                                 "sensibilite_micro", "effet_perso")
+                                                 "sensibilite_micro", "effet_perso", "effet_perso_clarte",
+                                                 "volume_voix")
     for key in ("sortie_audio", "micro"):
         if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
             config.save(key, None)

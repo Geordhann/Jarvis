@@ -107,9 +107,10 @@ python -m jarvis --effet perso
 python -m jarvis --effet-perso 73,100,13   # PowerPitch, mix du Robotifier, Hauteur (défaut : « Tactical Droid »)
 ```
 Ou à la voix : « Jarvis, mode perso » / « mode voicemod ». Plus le dernier chiffre est bas, plus la voix est grave.
-L'effet a été calé sur un enregistrement de la vraie voix Voicemod : bourdonnement robotique fixe à 120 Hz
-et son très sombre. Pour changer la note du bourdonnement : `python -m jarvis` avec le réglage
-`"effet_perso_bourdon": "100"` dans `~/.jarvis.json` (plus bas = plus grave).
+L'effet a été calé sur des enregistrements : bourdonnement robotique fixe à 120 Hz, voix claire et
+normalisée en volume. À l'oreille :
+- « Jarvis, voix plus claire » / « voix moins étouffée » / « voix plus sombre » (ou `--effet-perso-clarte 600 à 8000`, défaut 3000) ;
+- « Jarvis, parle plus fort » / « parle moins fort » (ou `--volume-voix 150`, 100 = normal, max 300).
 
 
 ### Voix de Jarvis dans Voicemod (facultatif)
