@@ -32,6 +32,16 @@ cherche sur le web, ouvre des pages, se souvient de toi, et te répond avec une 
 
 ## 1. Installation
 
+### Windows : en un double-clic
+1. Dézippe le dossier, par exemple dans `Documents\jarvis`.
+2. Double-clique sur **`INSTALLER-JARVIS.bat`**.
+
+Il arrête l'ancien Jarvis, installe tout, te propose d'effacer les anciens réglages, puis te guide :
+clé Claude, haut-parleurs (avec test du son), micro, voix et effet, personnalité, options, Google,
+icône sur le Bureau et lancement au démarrage. Il faut Python (https://www.python.org/downloads/,
+case « Add python.exe to PATH » cochée).
+
+### À la main (Windows, macOS, Linux)
 Il faut Python 3.10 ou plus récent.
 
 ```bash

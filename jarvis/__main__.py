@@ -624,7 +624,7 @@ def main() -> None:
     if args.configurer:
         from .setup_wizard import run as wizard
 
-        return wizard()
+        return wizard(choose_voice=choose_voice_menu)
     if args.profil:
         print(f"Profil ouvert : {profile.open_in_editor()}")
         return

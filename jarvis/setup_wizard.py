@@ -1,19 +1,18 @@
-"""Assistant de configuration pas à pas : python -m jarvis --configurer"""
+"""Assistant de configuration pas à pas : python -m jarvis --configurer (lancé par INSTALLER-JARVIS.bat)."""
 
 from __future__ import annotations
 
-import getpass
+import importlib.util
+import os
 
-from . import autostart, config, profile, voices
-from .tools import media
+from . import autostart, config, effects, personalities, profile, voices
 from .tools import google as google_tools
+from .tools import media
 
 
-def _ask(question: str, default: str | None = None, secret: bool = False) -> str:
+def _ask(question: str, default: str | None = None) -> str:
     suffix = f" [{default}]" if default else ""
-    prompt = f"{question}{suffix} : "
-    answer = (getpass.getpass(prompt) if secret else input(prompt)).strip()
-    return answer or (default or "")
+    return input(f"{question}{suffix} : ").strip() or (default or "")
 
 
 def _yes(question: str, default: bool = True) -> bool:
@@ -25,80 +24,122 @@ def _title(text: str) -> None:
     print(f"\n━━━ {text} ━━━")
 
 
-def run() -> None:
-    print("Bienvenue ! Je vais configurer Jarvis étape par étape. Entrée = garder la valeur proposée.")
+def _clear() -> None:
+    os.system("cls" if os.name == "nt" else "clear")  # une clé collée ne reste pas à l'écran
 
-    _title("1. Cerveau (Claude)")
-    print("Clé API sur https://console.anthropic.com/ → API Keys (le crédit se met dans Billing).")
-    if config.load().get("cle_api") and not _yes("Une clé est déjà enregistrée. La changer ?", False):
-        pass
-    else:
-        print("(La clé s'affiche en clair pour que tu vérifies le collage : ne fais pas de capture d'écran.)")
-        key = _ask("Clé API Anthropic (sk-ant-…), clic droit pour coller")
-        if key:
-            config.save("cle_api", key)
-            print("\033[2J\033[H", end="")  # efface l'écran : la clé ne reste pas affichée
-            from .keycheck import run as check_key
 
-            check_key()
-    model = _ask("Modèle : opus (le plus intelligent), sonnet (2x moins cher), haiku (4x moins cher)",
-                 config.get("modele", "opus"))
-    config.save("modele", model)
+def _pick(names: list[str], question: str) -> str | None:
+    """Liste numérotée ; renvoie le nom choisi, ou None (Entrée = par défaut de Windows)."""
+    for i, name in enumerate(names, 1):
+        print(f"  {i:2d}. {name}")
+    while True:
+        choice = _ask(f"{question} (numéro, Entrée = celui de Windows)")
+        if not choice:
+            return None
+        if choice.isdigit() and 1 <= int(choice) <= len(names):
+            return names[int(choice) - 1]
+        print("Numéro invalide.")
+
+
+def _say(text: str) -> None:
+    from .voice import Voice
+
+    voice = Voice()
+    voice.say(text)
+    voice.wait()
+
+
+def run(choose_voice=None) -> None:
+    print("Configuration de Jarvis, étape par étape. Entrée = garder la valeur proposée.")
+
+    _title("1. Clé Claude")
+    print("Clé sur https://console.anthropic.com/ → API Keys (crédit dans Billing).")
+    change = not config.load().get("cle_api") or _yes("Une clé est déjà enregistrée. La changer ?", False)
+    from .keycheck import run as check_key
+
+    while True:
+        if change:
+            print("Clic droit pour coller. Ne fais pas de capture d'écran : l'écran sera effacé juste après.")
+            key = _ask("Clé API (sk-ant-…)")
+            if key:
+                config.save("cle_api", key)
+                _clear()
+        config.apply_api_key()
+        if check_key() or not _yes("La clé ne marche pas. Réessayer ?", True):
+            break
+        change = True
     config.save("titre", _ask("Comment Jarvis doit-il t'appeler ?", config.get("titre", "Monsieur")))
 
-    _title("2. Qui tu es")
-    print("Jarvis lit un fichier « profil » à chaque conversation : ton métier, tes proches, tes habitudes…")
-    if _yes("Ouvrir le profil pour le remplir maintenant ?"):
-        path = profile.open_in_editor()
-        print(f"Fichier : {path}. Enregistre-le puis reviens ici.")
-        input("Appuie sur Entrée quand c'est fait…")
+    _title("2. Haut-parleurs")
+    from .audio_devices import input_names, output_names
 
-    _title("3. Voix (ElevenLabs)")
-    print("Clé sur https://elevenlabs.io → Profile → API Keys. Sans clé, Jarvis garde la voix gratuite.")
-    key = _ask("Clé ElevenLabs (Entrée pour passer)", secret=True)
-    if key:
-        config.save("elevenlabs_cle", key)
-    print("Voix disponibles : " + ", ".join(voices.catalog()))
-    voice = voices.find_voice(_ask("Voix de Jarvis", voices.load_saved_voice() or voices.default_voice()))
-    if voice:
-        voices.save_voice(voice)
+    try:
+        out = _pick(output_names(), "Où Jarvis doit parler")
+        config.save("sortie_audio", out)
+    except Exception as exc:
+        print(f"Impossible de lister les sorties ({exc}) : sortie de Windows utilisée.")
+    print("Test du son…")
+    _say("Bonjour, je suis Jarvis. Est-ce que tu m'entends ?")
+    if not _yes("Tu as entendu Jarvis ?"):
+        print("Vérifie le volume, ou relance plus tard : python -m jarvis --configurer")
 
-    effect = _ask("Effet sur la voix : aucun, ia, droide, tactique, robot", config.get("effet", "aucun"))
-    if effect in ("aucun", "ia", "droide", "tactique", "robot"):
+    _title("3. Micro")
+    names = list(dict.fromkeys(input_names()))
+    mic = _pick(names, "Micro à utiliser")
+    config.save("micro", mic)
+
+    _title("4. Voix")
+    if choose_voice and _yes("Écouter les voix et en choisir une ?", True):
+        choose_voice(False)
+    for name, description in effects.PRESETS.items():
+        print(f"  - {name} : {description}")
+    effect = _ask("Effet sur la voix", config.get("effet", "aucun")).lower()
+    if effect in effects.PRESETS:
         config.save("effet", effect)
+        _say("Voici ma voix avec cet effet.")
 
-    _title("4. Gmail et Google Agenda")
+    _title("5. Personnalité")
+    for name, (_, description) in personalities.PERSONALITIES.items():
+        print(f"  - {name} : {description}")
+    choice = personalities.resolve(_ask("Personnalité", personalities.current()))
+    if choice:
+        config.save("personnalite", choice)
+
+    _title("6. Options")
+    config.save("bruitages", "oui" if _yes("Bruitages façon Iron Man ?", True) else "non")
+    config.save("interruption", "oui" if _yes("Pouvoir le couper en disant « Jarvis, stop » ?", True) else "non")
+    if importlib.util.find_spec("faster_whisper") and importlib.util.find_spec("openwakeword"):
+        local = _yes("Écoute sur le PC (Whisper + « Hey Jarvis », rien n'est envoyé avant le mot d'éveil) ?", True)
+        config.save("reconnaissance", "whisper" if local else "google")
+        config.save("eveil_local", "oui" if local else "non")
+    config.save("dossier_musique", _ask("Dossier de ta musique", str(media.music_dir())))
+
+    _title("7. Google (Gmail, Agenda, Drive, YouTube…)")
     if google_tools.is_connected():
-        print("Déjà connecté.")
-    elif _yes("Connecter Gmail et Google Agenda maintenant ? (suivre d'abord le README, étape Google)", False):
-        client = _ask("Chemin du fichier JSON téléchargé depuis Google Cloud", str(google_tools.client_secret_path()))
+        print("Déjà connecté ✔")
+    elif _yes("Connecter Google maintenant ? (il faut le fichier JSON, voir README)", False):
+        path = _ask("Chemin du fichier JSON (glisse-le dans la fenêtre)").strip().strip('"')
         try:
-            google_tools.connect(client if client != str(google_tools.client_secret_path()) else None)
+            google_tools.connect(path or None)
             print("Google connecté ✔")
         except Exception as exc:
-            print(f"Connexion impossible : {exc}")
+            print(f"Connexion impossible : {exc}. Plus tard : python -m jarvis --connecter-google")
 
-    _title("5. SMS (téléphone Android)")
-    if _yes("Configurer l'envoi de SMS ? (appli SMS Gateway sur ton Android, voir README)", False):
-        from .tools import sms
+    _title("8. Qui tu es (facultatif)")
+    if _yes("Remplir ton profil (métier, proches, habitudes) maintenant ?", False):
+        print(f"Fichier ouvert : {profile.open_in_editor()}")
+        input("Enregistre-le, puis appuie sur Entrée…")
 
-        sms.configure()
-
-    _title("6. Musique")
-    folder = _ask("Dossier de ta musique sur l'ordinateur", str(media.music_dir()))
-    config.save("dossier_musique", folder)
-    print("Si un morceau n'y est pas, Jarvis le lance sur YouTube.")
-
-    _title("7. Démarrage automatique")
-    if _yes("Créer l'icône Jarvis sur le Bureau et dans le menu Démarrer ?"):
-        try:
-            for path in autostart.create_shortcuts():
-                print(f"Icône créée : {path}")
-        except Exception as exc:
-            print(f"Impossible de créer l'icône : {exc}")
-    if _yes("Afficher la boule animée sur l'écran ?"):
-        config.save("orbe", "oui")
-    if _yes("Lancer Jarvis automatiquement à chaque démarrage de l'ordinateur ?"):
+    _title("9. Icône et démarrage")
+    config.save("orbe", "oui")
+    try:
+        for path in autostart.create_shortcuts():
+            print(f"Icône créée : {path}")
+    except Exception as exc:
+        print(f"Impossible de créer l'icône : {exc}")
+    if _yes("Lancer Jarvis automatiquement à chaque démarrage du PC ?", True):
         print(f"Installé : {autostart.install()}")
+    else:
+        autostart.uninstall()
 
-    print("\nTerminé ! Lance Jarvis avec : python -m jarvis")
+    print("\n✔ Terminé ! Double-clique sur l'icône Jarvis du Bureau.")
