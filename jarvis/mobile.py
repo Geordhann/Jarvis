@@ -95,12 +95,18 @@ def configure(port: int) -> None:
         print("✘ Tailscale ne répond pas : ouvre l'appli Tailscale sur le PC et connecte-toi.")
         return
     print("Activation de l'accès HTTPS privé (tailscale serve)…")
-    serve = subprocess.run([exe, "serve", "--bg", str(port)], capture_output=True, text=True, timeout=60)
-    output = (serve.stdout + serve.stderr).strip()
+    print("Si un lien « login.tailscale.com » s'affiche, ouvre-le et clique pour autoriser : la commande "
+          "continue toute seule ensuite.\n")
+    try:
+        # Sortie affichée en direct : Tailscale peut demander d'autoriser HTTPS/Serve via un lien.
+        serve = subprocess.run([exe, "serve", "--bg", str(port)], timeout=600)
+    except subprocess.TimeoutExpired:
+        print("\n✘ Tailscale attend toujours l'autorisation. Ouvre le lien affiché, puis relance : "
+              "python -m jarvis --configurer-mobile")
+        return
     if serve.returncode != 0:
-        print(output)
-        print("\n✘ Si un lien « login.tailscale.com » s'affiche ci-dessus, ouvre-le pour autoriser "
-              "HTTPS/Serve sur ton réseau Tailscale, puis relance : python -m jarvis --configurer-mobile")
+        print("\n✘ Tailscale a refusé. Ouvre le lien affiché ci-dessus s'il y en a un, puis relance : "
+              "python -m jarvis --configurer-mobile")
         return
     config.save("hote_mobile", dns)
     if not code():
