@@ -395,9 +395,19 @@ $("reset").addEventListener("click", async () => {
   addMessage("msg jarvis", "C'est oublié. On repart de zéro.");
 });
 
-loadStatus().then(() => addMessage("msg jarvis", theme ? theme.salutation : "Bonjour. Tous les systèmes sont opérationnels."));
+const launch = new URLSearchParams(location.search).get("ecoute");
+loadStatus().then(() => {
+  if (launch) {
+    // Ouverte par « Ok Google, ouvre Jarvis » ou l'icône : pas de bonjour, on écoute tout de suite.
+    history.replaceState(null, "", "/");
+    if (launch === "mains-libres") { $("handsfree").checked = true; startListening(true); }
+    else startListening(false);
+    return;
+  }
+  addMessage("msg jarvis", theme ? theme.salutation : "Bonjour. Tous les systèmes sont opérationnels.");
+});
 try {
-  if (localStorage.getItem("jarvis-handsfree") === "1" && Recognition) { $("handsfree").checked = true; startListening(true); }
+  if (localStorage.getItem("jarvis-handsfree") === "1" && Recognition && launch !== "1") { $("handsfree").checked = true; startListening(true); }
 } catch (_) {}
 </script>
 </body>

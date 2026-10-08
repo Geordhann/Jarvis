@@ -350,6 +350,10 @@ Le PC fait le travail ; le téléphone sert de micro, d'écran et de haut-parleu
 
 L'interface n'est visible que par tes appareils Tailscale (jamais sur Internet), en HTTPS, avec code
 d'accès (5 erreurs = blocage 10 minutes). Le PC doit être allumé avec Jarvis lancé.
+
+**Sans ouvrir l'appli à la main** : une fois l'icône ajoutée à l'écran d'accueil, dis
+« **Ok Google, ouvre Jarvis** » (ou touche l'icône) : il écoute aussitôt, pose ta question. Appui long
+sur l'icône → « Mains libres » pour qu'il reste à l'écoute de « Jarvis… ».
 Changer le code : `python -m jarvis --nouveau-code-mobile`.
 
 ### Contrôler ton téléphone

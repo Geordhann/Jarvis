@@ -134,9 +134,12 @@ async def start():
 
     async def manifest(request: web.Request) -> web.Response:
         return web.json_response({
-            "name": "J.A.R.V.I.S.", "short_name": "Jarvis", "start_url": "/", "display": "standalone",
+            # Ouverte depuis l'écran d'accueil ou par « Ok Google, ouvre Jarvis » : elle écoute tout de suite.
+            "name": "J.A.R.V.I.S.", "short_name": "Jarvis", "start_url": "/?ecoute=1", "display": "standalone",
             "background_color": "#04090f", "theme_color": "#04090f",
             "icons": [{"src": "/icone.png", "sizes": "256x256", "type": "image/png"}],
+            "shortcuts": [{"name": "Parler à Jarvis", "url": "/?ecoute=1"},
+                          {"name": "Mains libres", "url": "/?ecoute=mains-libres"}],
         })
 
     async def icon(request: web.Request) -> web.Response:
