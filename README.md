@@ -332,6 +332,20 @@ titre ? », « **j'aime** ce titre », « mets le volume de Spotify à 40 ».
 Avec **Spotify Premium**, Jarvis lance directement la musique ; avec un compte gratuit, Spotify
 n'autorise pas le contrôle à distance : il ouvre le morceau et tu appuies sur lecture.
 
+### Depuis ton téléphone (partout, en privé)
+Le PC fait le travail ; le téléphone sert de micro, d'écran et de haut-parleur, même loin de chez toi.
+1. Installe **Tailscale** (gratuit) sur le PC et sur le téléphone : <https://tailscale.com/download>,
+   connecte-toi avec le **même compte** sur les deux.
+2. Sur le PC : `python -m jarvis --configurer-mobile` → il affiche l'adresse (`https://ton-pc….ts.net`)
+   et un **code d'accès**. (Si Tailscale affiche un lien pour activer HTTPS/Serve, ouvre-le puis relance.)
+3. Sur le téléphone, ouvre l'adresse dans **Chrome**, tape le code, puis menu ⋮ → **Ajouter à l'écran
+   d'accueil**. Autorise le micro, coche **Mains libres** et parle : « Jarvis… », « Ultron… » ou « Boss… »
+   selon le personnage choisi (boutons **Personnage** de la page).
+
+L'interface n'est visible que par tes appareils Tailscale (jamais sur Internet), en HTTPS, avec code
+d'accès (5 erreurs = blocage 10 minutes). Le PC doit être allumé avec Jarvis lancé.
+Changer le code : `python -m jarvis --nouveau-code-mobile`.
+
 ### Traducteur
 « Jarvis, dis à mon pote en anglais qu'on commence dans 5 minutes » : il traduit et le dit à voix haute
 avec une voix anglaise (aussi espagnol, allemand, italien, portugais, arabe, japonais, chinois…).

@@ -40,7 +40,7 @@ THEMES = {
                    "parole": (120, 255, 150)},
         "greeting": "{t}, ici Big Boss. Liaison codec établie. Prêt pour la mission ?",
         "switch": "{t}, ici Big Boss. Je prends le commandement. Garde la tête basse et reste à l'écoute.",
-        "wake": ("big boss", "boss", "bosse", "bigboss"),
+        "wake": ("boss", "big boss", "bosse", "bigboss"),
         "title": "Snake",
         "shortcut": "Big Boss",
     },
