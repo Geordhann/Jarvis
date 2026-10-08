@@ -716,6 +716,8 @@ def main() -> None:
     setup.add_argument("--elevenlabs", metavar="CLE", help="enregistrer ta clé ElevenLabs")
     setup.add_argument("--connecter-spotify", nargs="?", const="", metavar="CLIENT_ID",
                        help="relier ton compte Spotify (voir README, section Spotify)")
+    setup.add_argument("--connecter-telephone", action="store_true",
+                       help="laisser Jarvis contrôler ton téléphone Android (débogage sans fil, voir README)")
     setup.add_argument("--configurer-mobile", action="store_true",
                        help="parler à Jarvis depuis ton téléphone (Tailscale, voir README)")
     setup.add_argument("--nouveau-code-mobile", action="store_true", help="changer le code d'accès mobile")
@@ -825,6 +827,14 @@ def main() -> None:
 
         google_tools.connect(args.connecter_google or None)
         print("Terminé ! Redémarre Jarvis pour qu'il utilise ses nouveaux outils Google.")
+        return
+    if args.connecter_telephone:
+        from .tools import phone
+
+        try:
+            phone.connect()
+        except Exception as exc:
+            print(f"✘ Connexion au téléphone impossible : {exc}")
         return
     if args.configurer_mobile:
         from . import mobile

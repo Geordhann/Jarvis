@@ -142,6 +142,11 @@ class Agent:
             else "Gmail et Google Agenda ne sont pas connectés : si on te le demande, explique qu'il "
                  "faut lancer « python -m jarvis --connecter-google »."
         )
+        from .tools import phone as phone_tools
+
+        if phone_tools.is_configured():
+            tools_note += (" Tu contrôles aussi son téléphone Android (outils telephone_*) : notifications, écran, "
+                           "applis, toucher, écrire, appeler ; voir la skill telephone.")
         if spotify_tools.is_connected():
             tools_note += (" Spotify est connecté : pour la musique, utilise spotify_jouer et spotify_controle "
                            "plutôt que jouer_musique (sauf si l'utilisateur demande YouTube ou ses fichiers).")

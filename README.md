@@ -346,6 +346,16 @@ L'interface n'est visible que par tes appareils Tailscale (jamais sur Internet),
 d'accès (5 erreurs = blocage 10 minutes). Le PC doit être allumé avec Jarvis lancé.
 Changer le code : `python -m jarvis --nouveau-code-mobile`.
 
+### Contrôler ton téléphone
+Jarvis pilote ton Android par le **débogage sans fil** (outil officiel de Google) : « qu'est-ce que
+j'ai reçu sur mon téléphone ? », « ouvre Spotify sur mon téléphone », « regarde mon téléphone »,
+« réponds à Paul sur WhatsApp que j'arrive » (il écrit, te lit le message et n'envoie qu'après ton
+oui), « appelle maman » (après confirmation), batterie, volume, pause…
+Connexion une fois : `python -m jarvis --connecter-telephone` et suis les étapes affichées
+(options développeur, « Débogage sans fil », code d'association). Le téléphone et le PC doivent être
+sur le **même Wi-Fi**. Sur Xiaomi/Poco, active aussi « Débogage USB (paramètres de sécurité) » pour
+qu'il puisse toucher l'écran. Les accents ne passent pas dans la saisie (« é » devient « e »).
+
 ### Traducteur
 « Jarvis, dis à mon pote en anglais qu'on commence dans 5 minutes » : il traduit et le dit à voix haute
 avec une voix anglaise (aussi espagnol, allemand, italien, portugais, arabe, japonais, chinois…).

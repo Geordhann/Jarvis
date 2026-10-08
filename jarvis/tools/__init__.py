@@ -65,10 +65,10 @@ def boolean(description: str) -> dict:
 
 
 def all_tools(skills_map) -> list[Tool]:
-    from . import apps, browser, games, gaming, google, media, sms, speech, spotify, utilities, whatsapp
+    from . import apps, browser, games, gaming, google, media, phone, sms, speech, spotify, utilities, whatsapp
 
     return [*google.tools(), *sms.tools(), *whatsapp.tools(), *media.tools(), *apps.tools(),
-            *games.tools(), *gaming.tools(), *speech.tools(), *spotify.tools(), *utilities.tools(),
+            *games.tools(), *gaming.tools(), *speech.tools(), *spotify.tools(), *phone.tools(), *utilities.tools(),
             *browser.tools(),
             _skill_tool(skills_map), _reply_tool()]
 
