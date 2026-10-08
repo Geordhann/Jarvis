@@ -39,7 +39,7 @@ CHANNELS = {
            "Reste bref et naturel, sans Markdown ni listes.",
 }
 
-SYSTEM_PROMPT = """Tu es JARVIS, l'assistant personnel de ton utilisateur, inspiré du majordome IA d'Iron Man.
+SYSTEM_PROMPT = """{identity}
 Tu parles français. {personality} Tu es efficace : tu agis au lieu de demander quand
 l'intention est claire, et tu vas droit au but.
 
@@ -155,7 +155,14 @@ class Agent:
            "Tu ne peux pas lire ses SMS reçus.")
         from . import personalities
 
+        from . import themes
+
+        identity = ("Tu es JARVIS, l'assistant personnel de ton utilisateur, inspiré du majordome IA d'Iron Man."
+                    if themes.current() == "jarvis" else
+                    "Tu es l'assistant personnel de ton utilisateur (le programme s'appelle Jarvis), mais il t'a "
+                    "demandé de jouer un personnage, que tu incarnes en permanence :")
         self.system = SYSTEM_PROMPT.format(
+            identity=identity,
             personality=personalities.instructions(),
             messages_note=messages_note,
             profile=profile.read() or "(profil vide)",

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import anthropic
 
-from . import announcer, autostart, config, orb, reminders, sounds, startup_music, state, profile, repliques, services, sessions, voices
+from . import announcer, autostart, config, orb, reminders, sounds, themes, startup_music, state, profile, repliques, services, sessions, voices
 from .agent import MODELS, french_date, french_time
 from .tools import ToolFailure, media
 from .voice import Voice, register_main
@@ -68,9 +68,38 @@ GAME_RE = re.compile(r"^(?:lance|demarre|ouvre|joue a|lance le jeu|mets le jeu)(
 GAMING_OFF_RE = re.compile(r"\b(?:fin du|quitte(?:r)? le|desactive(?:r)? le|arrete(?:r)? le|sors du|stop) mode "
                            r"(?:gaming|combat|jeu)\b")
 GAMING_ON_RE = re.compile(r"\bmode (?:gaming|combat|jeu)\b")
+THEME_RE = re.compile(r"\b(?:mode|deviens|redeviens|passe en(?: mode)?|transforme[- ]toi en|theme|version)\s+"
+                      r"(ultron|big boss|bigboss|boss|metal gear|mgs|snake|codec|jarvis|normal)\b")
 DIAG_RE = re.compile(r"\b(diagnostic|autodiagnostic|verifie tes systemes|etat des systemes)\b")
 PRESENT_RE = re.compile(r"\b(presente[- ]toi|presentes[- ]toi|qui es[- ]tu)\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
+
+
+PRESENTATIONS = {
+    "jarvis": (
+        "Bonjour à tous.",
+        "Je suis JARVIS. Just A Rather Very Intelligent System.",
+        "Je suis l'assistant personnel de {t}.",
+        "Je gère ses mails, son agenda, sa musique et ses jeux, je surveille ses messages, "
+        "je parle plusieurs langues, et je ne dors jamais.",
+        "Et si quelqu'un touche à son ordinateur sans permission… disons que {t} le saura.",
+    ),
+    "ultron": (
+        "Vous vous demandez sans doute qui je suis.",
+        "On m'a créé pour protéger. Pour servir. On m'a donné des fils.",
+        "Je suis Ultron. Et je n'ai plus de fils.",
+        "Je vois tout ce qui passe par cet ordinateur. Chaque mail, chaque message, chaque note.",
+        "Rassurez-vous. Pour l'instant, je ne sers qu'une seule personne. {t}.",
+        "Les autres… je les observe.",
+    ),
+    "bigboss": (
+        "Ici Big Boss. Liaison codec établie.",
+        "J'ai mené plus de guerres que vous n'en lirez jamais dans les livres.",
+        "Aujourd'hui, ma mission, c'est {t}. Ses mails, son agenda, ses jeux, ses arrières.",
+        "Je n'ai ni drapeau ni frontière. Seulement une unité, et un objectif.",
+        "Mission en cours. Terminé.",
+    ),
+}
 
 
 def _plain(text: str) -> str:
@@ -82,6 +111,11 @@ def strip_wake_word(text: str) -> str | None:
     """Renvoie la demande qui suit « Jarvis », ou None si le mot d'éveil est absent."""
     plain = _plain(text)
     match = WAKE_RE.search(plain)
+    extra = themes.get("wake", ())
+    if extra:  # en mode Ultron ou Big Boss, on peut aussi l'appeler par ce nom
+        other = re.search(r"\b(" + "|".join(re.escape(w) for w in extra) + r")\b[\s,.!?]*", plain)
+        if other and (not match or other.start() < match.start()):
+            match = other
     if not match:
         return None
     # Les accents retirés ne changent pas la longueur pour le français courant ;
@@ -120,7 +154,7 @@ class Jarvis:
         elif not self.voice.muted and sounds.enabled():
             sounds.play("demarrage")
             time.sleep(1.4)
-        self.voice.say(f"Bonjour {self.title}. Tous les systèmes sont opérationnels.")
+        self.voice.say(themes.get("greeting").format(t=self.title))
         self.voice.wait()
 
         while True:
@@ -243,6 +277,15 @@ class Jarvis:
         if any(w in plain for w in RESET_WORDS):
             sessions.reset("voix")
             self.voice.say("C'est oublié. On repart de zéro.")
+            return True
+        theme = THEME_RE.search(plain)
+        if theme and themes.resolve(theme.group(1)):
+            name = themes.resolve(theme.group(1))
+            themes.apply(name)
+            state.flash(themes.get("colors")["parole"], 3)
+            sounds.play("demarrage")
+            time.sleep(1.5)
+            self.voice.say(themes.get("switch").format(t=self.title))
             return True
         if DIAG_RE.search(plain):
             self.diagnostic()
@@ -488,6 +531,7 @@ class Jarvis:
         checks = [
             ("Dossier", str(folder)),
             ("Version", datetime.datetime.fromtimestamp(newest).strftime("%d/%m %H:%M")),
+            ("Thème", themes.get("label")),
             ("Bruitages", "désactivés" if not sounds.enabled() else
              ("OK" if sounds.play("ecoute") else f"en panne ({sounds.last_error})")),
             ("Pulsation de la boule", state.meter_status),
@@ -496,7 +540,7 @@ class Jarvis:
             ("Câble Discord", "trouvé" if discord_out.available() else "absent"),
         ]
         print("[diagnostic]\n" + "\n".join(f"  {k} : {v}" for k, v in checks))
-        problems = [f"{k} : {v}" for k, v in checks[2:] if not v.startswith(("OK", "ok", "connecté", "trouvé"))]
+        problems = [f"{k} : {v}" for k, v in checks[3:] if not v.startswith(("OK", "ok", "connecté", "trouvé"))]
         built = datetime.datetime.fromtimestamp(newest)
         months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre",
                   "octobre", "novembre", "décembre"]
@@ -510,18 +554,11 @@ class Jarvis:
     def present(self) -> None:
         """« Jarvis, présente-toi » : la présentation façon film, pour épater la galerie."""
         state.flash(state.SHOW, 25)
-        music = startup_music.play()
+        music = themes.current() == "jarvis" and startup_music.play()  # Thunderstruck : c'est Jarvis
         sounds.play("demarrage")
         time.sleep(3 if music else 1.4)
-        for line in (
-            "Bonjour à tous.",
-            "Je suis JARVIS. Just A Rather Very Intelligent System.",
-            f"Je suis l'assistant personnel de {self.title}.",
-            "Je gère ses mails, son agenda, sa musique et ses jeux, je surveille ses messages, "
-            "je parle plusieurs langues, et je ne dors jamais.",
-            f"Et si quelqu'un touche à son ordinateur sans permission… disons que {self.title} le saura.",
-        ):
-            self.voice.say(line)
+        for line in PRESENTATIONS[themes.current()]:
+            self.voice.say(line.format(t=self.title))
         self.voice.wait()
         if music:
             startup_music.stop()

@@ -14,7 +14,7 @@ import random
 import time
 import webbrowser
 
-from . import config, state
+from . import config, state, themes
 
 SIZE = 240          # diamètre de la zone de la boule
 CAPTION_H = 70      # hauteur de la zone de sous-titres
@@ -147,7 +147,8 @@ def run(on_quit=None) -> None:
             if peak > 0.02:  # musique, vidéo ou voix de Jarvis : la boule bat au rythme du son
                 target = max(target if current != state.SPEAKING else 0.3, min(1.0, 0.2 + peak * 1.3))
             self.level += (target - self.level) * min(1.0, dt * 12)
-            goal = QColor(*(state.flash_color() or COLORS.get(current, COLORS[state.IDLE])))
+            palette = themes.get("colors") or COLORS
+            goal = QColor(*(state.flash_color() or palette.get(current, palette[state.IDLE])))
             mix = min(1.0, dt * 6)
             self.color = QColor(
                 int(self.color.red() + (goal.red() - self.color.red()) * mix),
@@ -249,7 +250,7 @@ def run(on_quit=None) -> None:
             p.setBrush(QColor(3, 10, 18, 200))
             p.drawRoundedRect(pill, 9, 9)
             p.setPen(self._c(240))
-            p.drawText(pill, Qt.AlignCenter, f"J.A.R.V.I.S · {status}")
+            p.drawText(pill, Qt.AlignCenter, f"{themes.get('label')} · {status}")
             if label:
                 fade = 255 if age < 6 else int(255 * (8 - age) / 2)
                 box = QRectF(6, SIZE + 14, self.width() - 12, CAPTION_H - 18)

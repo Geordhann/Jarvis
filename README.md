@@ -292,6 +292,17 @@ Pour désactiver : `python -m jarvis --interruption non`.
   sérieux », « mode motivant », « mode drôle », « mode majordome », « mode classique ».
 - **« Jarvis, présente-toi »** : sa présentation façon film, avec musique d'entrée si tu l'as.
 
+### Ultron et Big Boss (Metal Gear Solid)
+Jarvis peut se transformer complètement : voix, caractère, couleur de la boule, bruitages,
+salutation, présentation et nom pour l'appeler.
+- « Jarvis, **mode Ultron** » : voix grave et métallique, IA froide et ironique, boule **rouge**,
+  sons sombres. Tu peux ensuite l'appeler « **Ultron** ».
+- « Jarvis, **mode Big Boss** » (ou « mode Metal Gear ») : voix rugueuse passée par le **codec**,
+  soldat légendaire qui te parle comme en mission, boule **verte**, sonnerie de codec et alerte « ! ».
+  Tu peux l'appeler « **Boss** » ou « **Snake** ».
+- « **Redeviens Jarvis** » : tout revient comme avant (ta voix et ton caractère d'origine).
+Essaie « présente-toi » dans chaque mode.
+
 ### Jeux
 - **« Jarvis, lance Rocket League »** : lance directement un jeu Steam installé, même avec un nom
   approximatif ou un sigle (« lance RL », « lance GTA 5 »).

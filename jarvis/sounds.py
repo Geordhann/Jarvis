@@ -37,6 +37,63 @@ def _tone(freqs, duration: float, volume: float = 0.35, attack: float = 0.01, re
 
 
 def _render(name: str):
+    from . import themes
+
+    theme = themes.current()
+    if theme == "ultron":
+        return _render_ultron(name)
+    if theme == "bigboss":
+        return _render_codec(name)
+    return _render_jarvis(name)
+
+
+def _render_ultron(name: str):
+    """Sons d'Ultron : graves, saturés, inquiétants."""
+    import numpy as np
+
+    def grim(freqs, duration, volume=0.35, **kw):
+        tone = _tone(freqs, duration, volume=volume, **kw)
+        return np.tanh(tone * 4).astype(np.float32) * volume  # saturation
+
+    if name == "ecoute":
+        return np.concatenate([grim([220], 0.09), np.zeros(int(RATE * 0.03), np.float32), grim([165], 0.14)])
+    if name == "fin":
+        return grim([180, 90], 0.2, volume=0.3)
+    if name == "stop":
+        return grim([140, 60], 0.15, volume=0.35, release=0.03)
+    if name == "demarrage":
+        rise = grim([40, 55, 90, 130], 1.6, volume=0.3, attack=0.5, release=0.3)
+        t = np.arange(len(rise)) / RATE
+        rise *= (0.7 + 0.3 * np.sin(2 * np.pi * 6 * t)).astype(np.float32)  # pulsation lente
+        hit = grim([70, 35], 0.8, volume=0.4, attack=0.005, release=0.7)
+        return np.concatenate([rise, hit])
+    raise ValueError(name)
+
+
+def _render_codec(name: str):
+    """Sons façon codec de Metal Gear : bips radio aigus (sons recréés, pas d'extrait du jeu)."""
+    import numpy as np
+
+    def blip(freq, duration, volume=0.3):  # bip carré, façon vieille radio
+        t = np.arange(int(RATE * duration)) / RATE
+        env = np.minimum(1, t / 0.002) * np.minimum(1, (duration - t) / 0.01)
+        return (np.sign(np.sin(2 * np.pi * freq * t)) * env * volume * 0.5).astype(np.float32)
+
+    gap = lambda s: np.zeros(int(RATE * s), np.float32)  # noqa: E731
+    if name == "ecoute":  # alerte « ! »
+        return np.concatenate([_tone([1400, 2200], 0.08, volume=0.4, attack=0.002, release=0.02),
+                               _tone([2200], 0.18, volume=0.3, attack=0.002, release=0.15)])
+    if name == "fin":
+        return np.concatenate([blip(1800, 0.05), gap(0.03), blip(1800, 0.05)])
+    if name == "stop":
+        return blip(600, 0.12)
+    if name == "demarrage":  # appel codec : sonnerie à deux tons, deux fois
+        ring = np.concatenate([blip(1450, 0.09), blip(1150, 0.09)] * 3)
+        return np.concatenate([ring, gap(0.25), ring, gap(0.2), blip(2000, 0.12)])
+    raise ValueError(name)
+
+
+def _render_jarvis(name: str):
     import numpy as np
 
     if name == "ecoute":
@@ -59,8 +116,11 @@ def _sound(name: str):
     import numpy as np
     import pygame
 
+    from . import themes
+
+    key = f"{themes.current()}:{name}"
     with _lock:
-        if name not in _cache:
+        if key not in _cache:
             samples = (np.clip(_render(name) * 1.6, -1, 1) * 32767).astype(np.int16)  # bien audibles
             buffer = io.BytesIO()
             with wave.open(buffer, "wb") as w:
@@ -69,8 +129,8 @@ def _sound(name: str):
                 w.setframerate(RATE)
                 w.writeframes(samples.tobytes())
             buffer.seek(0)
-            _cache[name] = pygame.mixer.Sound(buffer)
-        return _cache[name]
+            _cache[key] = pygame.mixer.Sound(buffer)
+        return _cache[key]
 
 
 last_error: str | None = None
