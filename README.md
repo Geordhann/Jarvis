@@ -293,15 +293,20 @@ Pour désactiver : `python -m jarvis --interruption non`.
 - **« Jarvis, présente-toi »** : sa présentation façon film, avec musique d'entrée si tu l'as.
 
 ### Ultron et Big Boss (Metal Gear Solid)
-Jarvis peut se transformer complètement : voix, caractère, couleur de la boule, bruitages,
-salutation, présentation et nom pour l'appeler.
-- « Jarvis, **mode Ultron** » : voix grave et métallique, IA froide et ironique, boule **rouge**,
-  sons sombres. Tu peux ensuite l'appeler « **Ultron** ».
-- « Jarvis, **mode Big Boss** » (ou « mode Metal Gear ») : voix rugueuse passée par le **codec**,
-  soldat légendaire qui te parle comme en mission, boule **verte**, sonnerie de codec et alerte « ! ».
-  Tu peux l'appeler « **Boss** » ou « **Snake** ».
-- « **Redeviens Jarvis** » : tout revient comme avant (ta voix et ton caractère d'origine).
-Essaie « présente-toi » dans chaque mode.
+Trois personnages, chacun avec sa voix, son caractère, sa couleur, ses bruitages, **son nom** et
+**sa façon de t'appeler** :
+
+| Icône du Bureau | Tu l'appelles | Il t'appelle | Style |
+|---|---|---|---|
+| **Jarvis** (bleu) | « Jarvis, … » | Monsieur | majordome IA d'Iron Man |
+| **Ultron** (rouge) | « Ultron, … » | Seigneur | IA froide et menaçante, voix grave métallique |
+| **Big Boss** (vert) | « Boss, … » | Snake | soldat légendaire au codec, voix radio |
+
+- **Au lancement** : double-clique sur l'icône du personnage voulu (`python -m jarvis --installer`
+  crée les 3 icônes). Si Jarvis tourne déjà, il se transforme directement.
+- **À la voix** : « Jarvis, mode Ultron », « Ultron, mode Big Boss », « Boss, redeviens Jarvis ».
+- Seul le nom du personnage actif le réveille. Au retour à Jarvis, ta voix et ton caractère d'origine
+  reviennent. Essaie « présente-toi » avec chacun.
 
 ### Jeux
 - **« Jarvis, lance Rocket League »** : lance directement un jeu Steam installé, même avec un nom

@@ -97,6 +97,16 @@ async def start():
         voices.save_voice(name)
         return web.json_response({"ok": True, "voix": name})
 
+    async def set_theme(request: web.Request) -> web.Response:
+        from . import themes
+
+        name = themes.resolve(str((await request.json()).get("nom", "")))
+        if not name:
+            return web.json_response({"ok": False}, status=400)
+        state.request_theme(name)
+        state.request_visibility("afficher")
+        return web.json_response({"ok": True, "theme": name})
+
     async def version(request: web.Request) -> web.Response:
         return web.json_response({"version": code_version()})
 
@@ -107,6 +117,7 @@ async def start():
     app = web.Application(middlewares=[local_only])
     app.router.add_post("/api/orbe/afficher", show_orb)
     app.router.add_get("/api/version", version)
+    app.router.add_post("/api/theme", set_theme)
     app.router.add_get("/", index)
     app.router.add_post("/api/message", message)
     app.router.add_post("/api/voix/lire", speech)

@@ -325,8 +325,8 @@ def run(on_quit=None) -> None:
         on_quit()
 
 
-def save_icon(path) -> None:
-    """Dessine le réacteur en icône (pour le raccourci du Bureau)."""
+def save_icon(path, rgb: tuple[int, int, int] = (79, 214, 255)) -> None:
+    """Dessine le réacteur en icône (pour le raccourci du Bureau), dans la couleur du thème."""
     from PySide6.QtCore import QPointF, Qt
     from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPen, QPixmap, QRadialGradient
 
@@ -337,7 +337,7 @@ def save_icon(path) -> None:
     p = QPainter(pix)
     p.setRenderHint(QPainter.Antialiasing)
     c = QPointF(size / 2, size / 2)
-    cyan = QColor(79, 214, 255)
+    cyan = QColor(*rgb)
     p.setPen(Qt.NoPen)
     p.setBrush(QColor(3, 10, 18))
     p.drawEllipse(c, 124, 124)
@@ -349,7 +349,7 @@ def save_icon(path) -> None:
     glow = QRadialGradient(c, 64)
     glow.setColorAt(0, QColor(240, 252, 255))
     glow.setColorAt(0.4, cyan)
-    glow.setColorAt(1, QColor(79, 214, 255, 0))
+    glow.setColorAt(1, QColor(*rgb, 0))
     p.setPen(Qt.NoPen)
     p.setBrush(glow)
     p.drawEllipse(c, 64, 64)

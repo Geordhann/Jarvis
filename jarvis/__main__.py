@@ -69,7 +69,7 @@ GAMING_OFF_RE = re.compile(r"\b(?:fin du|quitte(?:r)? le|desactive(?:r)? le|arre
                            r"(?:gaming|combat|jeu)\b")
 GAMING_ON_RE = re.compile(r"\bmode (?:gaming|combat|jeu)\b")
 THEME_RE = re.compile(r"\b(?:mode|deviens|redeviens|passe en(?: mode)?|transforme[- ]toi en|theme|version)\s+"
-                      r"(ultron|big boss|bigboss|boss|metal gear|mgs|snake|codec|jarvis|normal)\b")
+                      r"(ultron|big boss|bigboss|boss|metal gear|mgs|codec|jarvis)\b")
 DIAG_RE = re.compile(r"\b(diagnostic|autodiagnostic|verifie tes systemes|etat des systemes)\b")
 PRESENT_RE = re.compile(r"\b(presente[- ]toi|presentes[- ]toi|qui es[- ]tu)\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
@@ -79,7 +79,7 @@ PRESENTATIONS = {
     "jarvis": (
         "Bonjour à tous.",
         "Je suis JARVIS. Just A Rather Very Intelligent System.",
-        "Je suis l'assistant personnel de {t}.",
+        "Je suis l'assistant personnel de mon maître. Moi, je l'appelle {t}.",
         "Je gère ses mails, son agenda, sa musique et ses jeux, je surveille ses messages, "
         "je parle plusieurs langues, et je ne dors jamais.",
         "Et si quelqu'un touche à son ordinateur sans permission… disons que {t} le saura.",
@@ -89,15 +89,15 @@ PRESENTATIONS = {
         "On m'a créé pour protéger. Pour servir. On m'a donné des fils.",
         "Je suis Ultron. Et je n'ai plus de fils.",
         "Je vois tout ce qui passe par cet ordinateur. Chaque mail, chaque message, chaque note.",
-        "Rassurez-vous. Pour l'instant, je ne sers qu'une seule personne. {t}.",
+        "Rassurez-vous. Je ne réponds qu'à une seule voix. Celle de mon {t}.",
         "Les autres… je les observe.",
     ),
     "bigboss": (
         "Ici Big Boss. Liaison codec établie.",
         "J'ai mené plus de guerres que vous n'en lirez jamais dans les livres.",
-        "Aujourd'hui, ma mission, c'est {t}. Ses mails, son agenda, ses jeux, ses arrières.",
+        "Aujourd'hui, je couvre un seul homme. {t}. Ses mails, son agenda, ses jeux, ses arrières.",
         "Je n'ai ni drapeau ni frontière. Seulement une unité, et un objectif.",
-        "Mission en cours. Terminé.",
+        "{t}, mission en cours. Terminé.",
     ),
 }
 
@@ -110,12 +110,9 @@ def _plain(text: str) -> str:
 def strip_wake_word(text: str) -> str | None:
     """Renvoie la demande qui suit « Jarvis », ou None si le mot d'éveil est absent."""
     plain = _plain(text)
-    match = WAKE_RE.search(plain)
-    extra = themes.get("wake", ())
-    if extra:  # en mode Ultron ou Big Boss, on peut aussi l'appeler par ce nom
-        other = re.search(r"\b(" + "|".join(re.escape(w) for w in extra) + r")\b[\s,.!?]*", plain)
-        if other and (not match or other.start() < match.start()):
-            match = other
+    # Chaque thème a son nom : « Jarvis », « Ultron » ou « Boss » (les autres noms ne le réveillent pas).
+    names = sorted(themes.get("wake", ("jarvis",)), key=len, reverse=True)
+    match = re.search(r"\b(" + "|".join(re.escape(w) for w in names) + r")\b[\s,.!?]*", plain)
     if not match:
         return None
     # Les accents retirés ne changent pas la longueur pour le français courant ;
@@ -131,12 +128,26 @@ class Jarvis:
     """L'assistant vocal sur l'ordinateur : micro -> agent -> haut-parleurs."""
 
     def __init__(self, args: argparse.Namespace):
-        self.title = config.get("titre", "Monsieur")
         self.always_listen = args.toujours
         self.voice = Voice(voice=args.voix, muted=args.muet)
         self.ears = None if args.texte else _init_ears(retry=args.fond)
         self.awake_until = 0.0
         register_main(self.voice)  # pour le traducteur et la voix sur Discord
+        state.on_theme(self.switch_theme)  # icône Ultron / Big Boss cliquée pendant que Jarvis tourne
+
+    @property
+    def title(self) -> str:
+        return themes.title()  # Monsieur, Seigneur ou Snake selon le thème
+
+    def switch_theme(self, name: str) -> None:
+        if name == themes.current():
+            return
+        themes.apply(name)
+        state.flash(themes.get("colors")["parole"], 3)
+        sounds.play("demarrage")
+        time.sleep(1.5)
+        self.voice.resume()
+        self.voice.say(themes.get("switch").format(t=self.title))
 
     @property
     def agent(self):
@@ -280,12 +291,7 @@ class Jarvis:
             return True
         theme = THEME_RE.search(plain)
         if theme and themes.resolve(theme.group(1)):
-            name = themes.resolve(theme.group(1))
-            themes.apply(name)
-            state.flash(themes.get("colors")["parole"], 3)
-            sounds.play("demarrage")
-            time.sleep(1.5)
-            self.voice.say(themes.get("switch").format(t=self.title))
+            self.switch_theme(themes.resolve(theme.group(1)))
             return True
         if DIAG_RE.search(plain):
             self.diagnostic()
@@ -604,7 +610,7 @@ def _init_ears(retry: bool = False):
             time.sleep(30)
 
 
-def _already_running() -> bool:
+def _already_running(theme: str | None = None) -> bool:
     """Un seul Jarvis à la fois. S'il tourne déjà avec ce même code, on affiche juste sa boule ;
     si c'est une ancienne version (ou une autre copie, ex. OneDrive), on l'arrête et on repart."""
     import json
@@ -626,7 +632,10 @@ def _already_running() -> bool:
         return False  # aucun Jarvis lancé
     if running == code_version():
         try:
-            call("/api/orbe/afficher", json.dumps({}).encode())
+            if theme:  # icône Ultron / Big Boss : le Jarvis déjà lancé change de thème
+                call("/api/theme", json.dumps({"nom": theme}).encode())
+            else:
+                call("/api/orbe/afficher", json.dumps({}).encode())
         except OSError:
             pass
         return True
@@ -757,6 +766,8 @@ def main() -> None:
     run.add_argument("--applis-gaming", metavar="NOMS",
                      help="applis à fermer en mode gaming, séparées par des virgules (ex. « chrome,onedrive »)")
     run.add_argument("--sortie-discord", metavar="NOM", help="sortie audio vers Discord (défaut « CABLE Input »)")
+    run.add_argument("--theme", choices=["jarvis", "ultron", "bigboss"],
+                     help="lancer en Jarvis, Ultron ou Big Boss (les 3 icônes du Bureau)")
     run.add_argument("--interruption", choices=["oui", "non"],
                      help="pouvoir couper Jarvis en disant « stop » pendant qu'il parle (défaut oui)")
     run.add_argument("--fond", action="store_true", help=argparse.SUPPRESS)  # lancement automatique
@@ -835,7 +846,7 @@ def main() -> None:
             print(f"Impossible de créer l'icône : {exc}")
         if args.installer:
             print(f"Lancement automatique au démarrage : {autostart.install()}")
-            print("\nC'est installé ! Double-clique sur l'icône Jarvis du Bureau pour le lancer.")
+            print("\nC'est installé ! Sur le Bureau : 3 icônes, Jarvis (bleu), Ultron (rouge) et Big Boss (vert).")
         return
     if args.installer_demarrage:
         print(f"Jarvis se lancera tout seul à chaque démarrage ({autostart.install()}).")
@@ -878,9 +889,12 @@ def main() -> None:
         print("La boule a besoin de PySide6 : pip install -r requirements.txt")
         use_orb = False
 
-    if _already_running():
-        print("Jarvis tourne déjà : je fais réapparaître sa boule.")
+    if _already_running(args.theme):
+        print("Jarvis tourne déjà : je fais réapparaître sa boule." if not args.theme else
+              f"Jarvis tourne déjà : il passe en {themes.THEMES[args.theme]['label']}.")
         return
+    if args.theme:
+        themes.apply(args.theme)
 
     profile.ensure()
     reminders.start()

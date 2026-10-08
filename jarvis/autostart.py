@@ -79,28 +79,34 @@ def uninstall() -> Path | None:
 _PS_SHORTCUT = r"""
 $shell = New-Object -ComObject WScript.Shell
 $places = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs'))
+$links = $env:JARVIS_LINKS | ConvertFrom-Json
 foreach ($dir in $places) {
-    $link = $shell.CreateShortcut((Join-Path $dir 'Jarvis.lnk'))
-    $link.TargetPath = $env:JARVIS_EXE
-    $link.Arguments = $env:JARVIS_ARGS
-    $link.WorkingDirectory = $env:JARVIS_DIR
-    if ($env:JARVIS_ICON) { $link.IconLocation = $env:JARVIS_ICON }
-    $link.Description = 'Jarvis, assistant personnel'
-    $link.Save()
-    Write-Output (Join-Path $dir 'Jarvis.lnk')
+    foreach ($item in $links) {
+        $path = Join-Path $dir ($item.name + '.lnk')
+        $link = $shell.CreateShortcut($path)
+        $link.TargetPath = $env:JARVIS_EXE
+        $link.Arguments = $item.args
+        $link.WorkingDirectory = $env:JARVIS_DIR
+        if ($item.icon) { $link.IconLocation = $item.icon }
+        $link.Description = $item.name + ', assistant personnel'
+        $link.Save()
+        Write-Output $path
+    }
 }
 """
 
 
-def _icon_path() -> str | None:
-    """Crée l'icône du réacteur (jarvis.ico) avec PySide6 si disponible."""
+def _icon_path(theme: str = "jarvis") -> str | None:
+    """Crée l'icône du réacteur dans la couleur du thème (bleu, rouge ou vert) avec PySide6."""
     from . import config
+    from .themes import THEMES
 
-    path = config.data_dir() / ("jarvis.ico" if sys.platform == "win32" else "jarvis.png")
+    ext = "ico" if sys.platform == "win32" else "png"
+    path = config.data_dir() / ("jarvis." + ext if theme == "jarvis" else f"{theme}.{ext}")
     try:
         from .orb import save_icon
 
-        save_icon(path)
+        save_icon(path, THEMES[theme]["colors"]["veille"])
         return str(path)
     except Exception as exc:
         print(f"[raccourci] icône non créée ({exc}), icône par défaut utilisée.")
@@ -111,11 +117,18 @@ def create_shortcuts() -> list[str]:
     """Icône « Jarvis » à double-cliquer : Bureau + menu Démarrer (ou équivalents)."""
     import subprocess
 
+    import json
+
+    from .themes import THEMES
+
     python = _python()
     icon = _icon_path()
     if sys.platform == "win32":
-        env = {**os.environ, "JARVIS_EXE": python, "JARVIS_ARGS": " ".join(ARGS),
-               "JARVIS_DIR": str(PROJECT_DIR), "JARVIS_ICON": icon or ""}
+        # Trois icônes : Jarvis, Ultron et Big Boss, chacune lance (ou transforme) Jarvis dans son thème.
+        links = [{"name": t["shortcut"], "args": " ".join([*ARGS, "--theme", key]), "icon": _icon_path(key) or ""}
+                 for key, t in THEMES.items()]
+        env = {**os.environ, "JARVIS_EXE": python, "JARVIS_LINKS": json.dumps(links),
+               "JARVIS_DIR": str(PROJECT_DIR)}
         out = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", _PS_SHORTCUT],
                              env=env, capture_output=True, text=True, check=True)
         return [line for line in out.stdout.splitlines() if line.strip()]

@@ -49,7 +49,9 @@ def _watch_gmail(say: Callable[[str], None]) -> None:
             new = [m for m in mails if m[0] not in seen]
             seen.update(m[0] for m in new)
             if new and enabled():
-                titre = config.get("titre", "Monsieur")
+                from . import themes
+
+                titre = themes.title()
                 if len(new) == 1:
                     _, sender, subject = new[0]
                     say(f"{titre}, nouveau mail de {sender} : {subject}.")

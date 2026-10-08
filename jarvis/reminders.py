@@ -82,7 +82,9 @@ def _loop() -> None:
             text = reminder["texte"]
             if late > datetime.timedelta(minutes=10):  # PC éteint au moment prévu
                 text += " (rappel en retard)"
-            message = f"{config.get('titre', 'Monsieur')}, petit rappel : {text}."
+            from . import themes
+
+            message = f"{themes.title()}, petit rappel : {text}."
             for listener in list(_listeners):
                 try:
                     listener(message)

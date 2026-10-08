@@ -161,6 +161,7 @@ class Agent:
                     if themes.current() == "jarvis" else
                     "Tu es l'assistant personnel de ton utilisateur (le programme s'appelle Jarvis), mais il t'a "
                     "demandé de jouer un personnage, que tu incarnes en permanence :")
+        identity += f" Appelle l'utilisateur « {themes.title()} »."
         self.system = SYSTEM_PROMPT.format(
             identity=identity,
             personality=personalities.instructions(),
