@@ -73,14 +73,21 @@ def _sound(name: str):
         return _cache[name]
 
 
-def play(name: str) -> None:
+last_error: str | None = None
+
+
+def play(name: str) -> bool:
     """Joue un bruitage sans bloquer (ne fait rien si désactivé ou sans sortie son)."""
+    global last_error
     if not enabled():
-        return
+        return False
     try:
         from .audio_out import ensure_mixer
 
         ensure_mixer()
         _sound(name).play()
+        return True
     except Exception as exc:
+        last_error = str(exc)
         print(f"[bruitage] « {name} » impossible : {exc}")
+        return False

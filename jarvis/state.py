@@ -8,6 +8,7 @@ import time
 IDLE, LISTENING, THINKING, SPEAKING = "veille", "écoute", "réflexion", "parole"
 
 _lock = threading.Lock()
+meter_status = "boule non lancée"  # pulsation de la boule sur le son du PC (diagnostic)
 _state = IDLE
 _caption = ""
 _caption_time = 0.0

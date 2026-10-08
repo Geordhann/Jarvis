@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 import unicodedata
+from pathlib import Path
 
 import anthropic
 
@@ -67,6 +68,7 @@ GAME_RE = re.compile(r"^(?:lance|demarre|ouvre|joue a|lance le jeu|mets le jeu)(
 GAMING_OFF_RE = re.compile(r"\b(?:fin du|quitte(?:r)? le|desactive(?:r)? le|arrete(?:r)? le|sors du|stop) mode "
                            r"(?:gaming|combat|jeu)\b")
 GAMING_ON_RE = re.compile(r"\bmode (?:gaming|combat|jeu)\b")
+DIAG_RE = re.compile(r"\b(diagnostic|autodiagnostic|verifie tes systemes|etat des systemes)\b")
 PRESENT_RE = re.compile(r"\b(presente[- ]toi|presentes[- ]toi|qui es[- ]tu)\b")
 VOICE_LIST_RE = re.compile(r"\b(quelles voix|liste des voix|change de voix|changer de voix|autre voix)\b")
 
@@ -241,6 +243,9 @@ class Jarvis:
         if any(w in plain for w in RESET_WORDS):
             sessions.reset("voix")
             self.voice.say("C'est oublié. On repart de zéro.")
+            return True
+        if DIAG_RE.search(plain):
+            self.diagnostic()
             return True
         if PRESENT_RE.search(plain):
             self.present()
@@ -470,6 +475,38 @@ class Jarvis:
             self.voice.say("Mode gaming désactivé. Retour à la normale.")
         return True
 
+    def diagnostic(self) -> None:
+        """« Jarvis, diagnostic » : vérifie ses systèmes et dit ce qui ne marche pas."""
+        from pathlib import Path
+
+        from . import discord_out
+        from .tools import google as google_tools
+        from .tools import spotify
+
+        folder = Path(__file__).resolve().parent.parent
+        newest = max(p.stat().st_mtime for p in Path(__file__).resolve().parent.rglob("*.py"))
+        checks = [
+            ("Dossier", str(folder)),
+            ("Version", datetime.datetime.fromtimestamp(newest).strftime("%d/%m %H:%M")),
+            ("Bruitages", "désactivés" if not sounds.enabled() else
+             ("OK" if sounds.play("ecoute") else f"en panne ({sounds.last_error})")),
+            ("Pulsation de la boule", state.meter_status),
+            ("Google", "connecté" if google_tools.is_connected() else "non connecté"),
+            ("Spotify", "connecté" if spotify.is_connected() else "non connecté"),
+            ("Câble Discord", "trouvé" if discord_out.available() else "absent"),
+        ]
+        print("[diagnostic]\n" + "\n".join(f"  {k} : {v}" for k, v in checks))
+        problems = [f"{k} : {v}" for k, v in checks[2:] if not v.startswith(("OK", "ok", "connecté", "trouvé"))]
+        built = datetime.datetime.fromtimestamp(newest)
+        months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre",
+                  "octobre", "novembre", "décembre"]
+        self.voice.say(f"Diagnostic terminé. Version du {built.day} {months[built.month - 1]} à {built.hour} h "
+                       f"{built.minute:02d}.")
+        if problems:
+            self.voice.say("Points à vérifier : " + ". ".join(problems) + ".")
+        else:
+            self.voice.say("Tous les systèmes sont opérationnels.")
+
     def present(self) -> None:
         """« Jarvis, présente-toi » : la présentation façon film, pour épater la galerie."""
         state.flash(state.SHOW, 25)
@@ -692,7 +729,7 @@ def main() -> None:
         log = open(config.LOG_PATH, "a", encoding="utf-8", buffering=1)
         sys.stdout = sys.stderr = log
         args.texte = False
-        print(f"\n=== Démarrage de Jarvis {datetime.datetime.now():%Y-%m-%d %H:%M} ===")
+        print(f"\n=== Démarrage de Jarvis {datetime.datetime.now():%Y-%m-%d %H:%M} — {Path(__file__).resolve().parent} ===")
 
     # --- réglages ponctuels ------------------------------------------------
     one_shot = False

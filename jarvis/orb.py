@@ -48,8 +48,10 @@ def _audio_meter():
         speakers = AudioUtilities.GetSpeakers()
         device = getattr(speakers, "_dev", speakers)  # selon la version de pycaw
         meter = device.Activate(IAudioMeterInformation._iid_, CLSCTX_ALL, None)
+        state.meter_status = "ok"
         return cast(meter, POINTER(IAudioMeterInformation))
     except Exception as exc:
+        state.meter_status = f"indisponible ({exc})"
         print(f"[boule] niveau du son indisponible ({exc}) : pas de pulsation sur la musique.")
         return None
 
