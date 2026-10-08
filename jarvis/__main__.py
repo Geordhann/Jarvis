@@ -282,6 +282,18 @@ class Jarvis:
         if ready:  # réplique prête à être dite : instantané et gratuit
             self.voice.say(ready)
             return True
+        from . import charm
+
+        added = charm.ADD_RE.search(request)  # texte d'origine : le prénom garde ses accents
+        if added:
+            charm.add(added.group(1))
+            self.voice.say(f"C'est noté. {added.group(1).capitalize()} a droit à mon meilleur charme.")
+            return True
+        target = charm.wants_charm(plain)
+        if target is not None:  # « que penses-tu de cette personne ? » : compliment mignon, instantané
+            state.flash((255, 120, 190), 6)  # la boule passe au rose
+            self.voice.say(charm.line(themes.current(), self.title, target))
+            return True
         if any(w in plain for w in STOP_WORDS):
             self.voice.say(f"À votre service, {self.title}. Bonne journée.")
             return False
@@ -773,6 +785,8 @@ def main() -> None:
     run.add_argument("--sortie-discord", metavar="NOM", help="sortie audio vers Discord (défaut « CABLE Input »)")
     run.add_argument("--theme", choices=["jarvis", "ultron", "bigboss"],
                      help="lancer en Jarvis, Ultron ou Big Boss (les 3 icônes du Bureau)")
+    run.add_argument("--charme", metavar="PRENOMS",
+                     help="prénoms pour le mode charmeur, ex. « Léa,Sarah » (« que penses-tu de Léa ? »)")
     run.add_argument("--interruption", choices=["oui", "non"],
                      help="pouvoir couper Jarvis en disant « stop » pendant qu'il parle (défaut oui)")
     run.add_argument("--fond", action="store_true", help=argparse.SUPPRESS)  # lancement automatique
@@ -795,7 +809,8 @@ def main() -> None:
                       ("effet_perso", "effet_perso"), ("effet_perso_clarte", "effet_perso_clarte"),
                       ("volume_voix", "volume_voix"), ("interruption", "interruption"),
                       ("bruitages", "bruitages"), ("personnalite", "personnalite"),
-                      ("applis_gaming", "applis_gaming"), ("sortie_discord", "sortie_discord")):
+                      ("applis_gaming", "applis_gaming"), ("sortie_discord", "sortie_discord"),
+                      ("charme", "charme")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
@@ -804,7 +819,7 @@ def main() -> None:
                                                  "musique_demarrage", "volume_fond", "musique_au_lancement",
                                                  "sensibilite_micro", "effet_perso", "effet_perso_clarte",
                                                  "volume_voix", "interruption", "bruitages",
-                                                 "personnalite", "applis_gaming", "sortie_discord")
+                                                 "personnalite", "applis_gaming", "sortie_discord", "charme")
     for key in ("sortie_audio", "micro"):
         if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
             config.save(key, None)

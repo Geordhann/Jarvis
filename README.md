@@ -308,6 +308,12 @@ Trois personnages, chacun avec sa voix, son caractère, sa couleur, ses bruitage
 - Seul le nom du personnage actif le réveille. Au retour à Jarvis, ta voix et ton caractère d'origine
   reviennent. Essaie « présente-toi » avec chacun.
 
+### Mode charmeur
+« Jarvis, **que penses-tu de cette personne ?** » (ou « tu la trouves comment ? », « que penses-tu de
+ma copine ? ») : compliment mignon et drôle, instantané, différent à chaque fois, adressé directement
+à la personne. La boule passe au rose. Chaque personnage a son style (Ultron et Big Boss aussi).
+Avec un prénom : « Jarvis, **ajoute Léa à ta liste de charme** », puis « que penses-tu de Léa ? ».
+
 ### Jeux
 - **« Jarvis, lance Rocket League »** : lance directement un jeu Steam installé, même avec un nom
   approximatif ou un sigle (« lance RL », « lance GTA 5 »).
