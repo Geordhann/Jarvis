@@ -41,6 +41,7 @@ MEDIA_COMMANDS = [
 MEDIA_COMMANDS = [(re.compile(rf"^(?:{p})(?: s'il te plait| stp)?$"), a) for p, a in MEDIA_COMMANDS]
 PLAY_RE = re.compile(r"^(?:mets|lance|joue)(?:-moi)?\s+(?:de la |la |une |un )?"
                      r"(?:musique|chanson|morceau|playlist|son)\s*(?:de |du |des |d')?(.*)$|^joue(?:-moi)?\s+(.+)$")
+SPOTIFY_RE = re.compile(r"^(?:mets|lance|joue)(?:-moi)?\s+.+\s(?:sur|avec) spotify$")
 ANNOUNCE_OFF_RE = re.compile(r"\b(arrete|stoppe|desactive|coupe) les annonces\b")
 ORB_HIDE_RE = re.compile(r"\b(cache[- ]toi|masque[- ]toi|cache la boule|masque la boule|disparais)\b")
 ORB_SHOW_RE = re.compile(r"\b(montre[- ]toi|affiche[- ]toi|affiche la boule|montre la boule|apparais)\b")
@@ -392,13 +393,16 @@ class Jarvis:
     def _handle_media(self, request: str, plain: str) -> bool:
         clean = plain.strip(" .!?")
         play = PLAY_RE.match(clean)
+        if ((play and (play.group(1) or play.group(2))) or SPOTIFY_RE.match(clean)) and not re.search(r"\b(sur|avec) youtube\b", clean):
+            if self._play_spotify(request, clean):
+                return True
         try:
             if play and (play.group(1) or play.group(2)):
                 # On reprend le texte original (accents compris) pour la recherche.
                 query = request.strip(" .!?")[len(clean) - len(play.group(1) or play.group(2)):]
                 self.voice.say("Je lance ça.")
                 self.voice.wait()
-                media.jouer_musique(query)
+                media.jouer_musique(re.sub(r"\s*(sur|avec) (youtube|spotify)\s*$", "", query, flags=re.I))
                 return True
             for pattern, action in MEDIA_COMMANDS:
                 if pattern.match(clean):
@@ -410,6 +414,26 @@ class Jarvis:
             self.voice.say(f"Je n'y arrive pas : {exc}.")
             return True
         return False
+
+    def _play_spotify(self, request: str, clean: str) -> bool:
+        """« Mets la playlist sport », « joue Daft Punk », « mets Highway to Hell sur Spotify »."""
+        from .tools import spotify
+
+        if not spotify.is_connected():
+            return False
+        verb = re.match(r"^(?:mets|lance|joue)(?:-moi)?\s+", clean)
+        # Texte original (accents compris) après le verbe, sans « de la musique de », « du »…
+        query = request.strip(" .!?")[len(request.strip(" .!?")) - len(clean) + verb.end():]
+        query = re.sub(r"^(?:de la |la |une |un |du |des |de |d')?(?:musique|chanson|morceau|son)s?\s+"
+                       r"(?:de |du |des |d')?|^(?:du |des |de l'|de )", "", query, flags=re.I)
+        try:
+            result = spotify.play_best(query)
+        except Exception as exc:  # Spotify indisponible : YouTube prend le relais
+            print(f"[spotify] {exc}")
+            return False
+        if "appuyer sur lecture" in result:
+            self.voice.say("C'est ouvert dans Spotify, il ne reste qu'à appuyer sur lecture.")
+        return True
 
     def _handle_game(self, plain: str) -> bool:
         """« Lance Rocket League » : démarre directement un jeu Steam installé, sans appeler Claude."""
@@ -507,19 +531,48 @@ def _init_ears(retry: bool = False):
 
 
 def _already_running() -> bool:
-    """Un seul Jarvis à la fois : s'il tourne déjà, on lui demande juste d'afficher sa boule."""
+    """Un seul Jarvis à la fois. S'il tourne déjà avec ce même code, on affiche juste sa boule ;
+    si c'est une ancienne version (ou une autre copie, ex. OneDrive), on l'arrête et on repart."""
     import json
     import urllib.request
 
-    from .webui import PORT
+    from .webui import PORT, code_version
 
-    request = urllib.request.Request(f"http://127.0.0.1:{PORT}/api/orbe/afficher", data=json.dumps({}).encode(),
-                                     headers={"X-Jarvis": "1", "Content-Type": "application/json"})
-    try:
+    def call(path: str, data: bytes | None = None):
+        request = urllib.request.Request(f"http://127.0.0.1:{PORT}{path}", data=data,
+                                         headers={"X-Jarvis": "1", "Content-Type": "application/json"})
         with urllib.request.urlopen(request, timeout=2) as response:
-            return response.status == 200
+            return json.loads(response.read() or b"{}")
+
+    try:
+        running = call("/api/version").get("version")
+    except urllib.error.HTTPError:
+        running = None  # ancienne version de Jarvis, sans cette adresse
     except OSError:
-        return False
+        return False  # aucun Jarvis lancé
+    if running == code_version():
+        try:
+            call("/api/orbe/afficher", json.dumps({}).encode())
+        except OSError:
+            pass
+        return True
+    print("Un ancien Jarvis tourne encore : je l'arrête pour lancer la nouvelle version.")
+    _stop_other_jarvis()
+    return False
+
+
+def _stop_other_jarvis() -> None:
+    import psutil
+
+    me = os.getpid()
+    for proc in psutil.process_iter(["pid", "cmdline"]):
+        cmdline = " ".join(proc.info["cmdline"] or [])
+        if proc.info["pid"] != me and "-m jarvis" in cmdline and "--configurer" not in cmdline:
+            try:
+                proc.kill()
+            except psutil.Error:
+                pass
+    time.sleep(2)  # le temps que Windows libère le micro, le son et l'adresse de l'interface
 
 
 def try_effects(muted: bool) -> None:
@@ -578,6 +631,8 @@ def main() -> None:
     setup.add_argument("--micro", metavar="NOM", help="micro utilisé par Jarvis ; « defaut » pour revenir au micro Windows")
     setup.add_argument("--dossier-musique", metavar="DOSSIER", help="dossier de ta musique locale")
     setup.add_argument("--elevenlabs", metavar="CLE", help="enregistrer ta clé ElevenLabs")
+    setup.add_argument("--connecter-spotify", nargs="?", const="", metavar="CLIENT_ID",
+                       help="relier ton compte Spotify (voir README, section Spotify)")
     setup.add_argument("--installer", action="store_true",
                        help="tout installer : icône sur le Bureau et le menu Démarrer, boule, lancement au démarrage")
     setup.add_argument("--raccourcis", action="store_true", help="créer l'icône Jarvis (Bureau + menu Démarrer)")
@@ -682,6 +737,15 @@ def main() -> None:
 
         google_tools.connect(args.connecter_google or None)
         print("Terminé ! Redémarre Jarvis pour qu'il utilise ses nouveaux outils Google.")
+        return
+    if args.connecter_spotify is not None:
+        from .tools import spotify
+
+        try:
+            spotify.connect(args.connecter_spotify or None)
+            print("Redémarre Jarvis pour qu'il utilise Spotify.")
+        except Exception as exc:
+            print(f"✘ Connexion Spotify impossible : {exc}")
         return
     if args.configurer_sms:
         from .tools import sms

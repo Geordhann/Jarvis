@@ -301,6 +301,21 @@ Pour désactiver : `python -m jarvis --interruption non`.
 - **Coach** : « Jarvis, regarde mon écran, comment je bats ce boss ? » : il regarde le jeu et te
   donne 2-3 conseils courts.
 
+### Spotify
+Connexion une fois (5 minutes) :
+1. Va sur <https://developer.spotify.com/dashboard>, connecte-toi avec ton compte Spotify, puis
+   **Create app**.
+2. Nom : `Jarvis`, description : `Assistant perso`. **Redirect URI** : `http://127.0.0.1:8766/callback`
+   (clique **Add**). Coche **Web API**, accepte les conditions, **Save**.
+3. Dans l'appli créée → **Settings** : copie le **Client ID**.
+4. `python -m jarvis --connecter-spotify TON_CLIENT_ID` : autorise Jarvis dans la page qui s'ouvre.
+
+Ensuite : « Jarvis, **joue Daft Punk** », « mets **Highway to Hell** sur Spotify », « mets **ma
+playlist** sport », « mets **mes titres likés** », « morceau suivant », « pause », « c'est quoi ce
+titre ? », « **j'aime** ce titre », « mets le volume de Spotify à 40 ».
+Avec **Spotify Premium**, Jarvis lance directement la musique ; avec un compte gratuit, Spotify
+n'autorise pas le contrôle à distance : il ouvre le morceau et tu appuies sur lecture.
+
 ### Traducteur
 « Jarvis, dis à mon pote en anglais qu'on commence dans 5 minutes » : il traduit et le dit à voix haute
 avec une voix anglaise (aussi espagnol, allemand, italien, portugais, arabe, japonais, chinois…).

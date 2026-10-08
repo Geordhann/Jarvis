@@ -97,12 +97,16 @@ async def start():
         voices.save_voice(name)
         return web.json_response({"ok": True, "voix": name})
 
+    async def version(request: web.Request) -> web.Response:
+        return web.json_response({"version": code_version()})
+
     async def show_orb(request: web.Request) -> web.Response:
         state.request_visibility("afficher")
         return web.json_response({"ok": True})
 
     app = web.Application(middlewares=[local_only])
     app.router.add_post("/api/orbe/afficher", show_orb)
+    app.router.add_get("/api/version", version)
     app.router.add_get("/", index)
     app.router.add_post("/api/message", message)
     app.router.add_post("/api/voix/lire", speech)
@@ -114,3 +118,15 @@ async def start():
     await web.TCPSite(runner, "127.0.0.1", PORT).start()
     print(f"[interface] ouverte sur http://localhost:{PORT}")
     return runner
+
+
+def code_version() -> str:
+    """Empreinte du code de Jarvis (dossier + dates des fichiers) : sert à savoir si le Jarvis
+    déjà lancé est une ancienne version, ou une autre copie (ex. dans OneDrive)."""
+    import hashlib
+
+    root = Path(__file__).resolve().parent
+    digest = hashlib.sha1(str(root).encode())
+    for path in sorted(root.rglob("*.py")):
+        digest.update(f"{path.relative_to(root)}:{path.stat().st_mtime_ns}".encode())
+    return digest.hexdigest()[:12]

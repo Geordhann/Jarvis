@@ -61,7 +61,7 @@ def _sound(name: str):
 
     with _lock:
         if name not in _cache:
-            samples = (np.clip(_render(name), -1, 1) * 32767).astype(np.int16)
+            samples = (np.clip(_render(name) * 1.6, -1, 1) * 32767).astype(np.int16)  # bien audibles
             buffer = io.BytesIO()
             with wave.open(buffer, "wb") as w:
                 w.setnchannels(1)

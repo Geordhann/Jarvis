@@ -19,6 +19,7 @@ from anthropic.lib.tools._beta_builtin_memory_tool import BetaLocalFilesystemMem
 
 from . import config, profile, repliques, skills
 from .tools import sms as sms_tools
+from .tools import spotify as spotify_tools
 from .tools import Tool, ToolFailure, all_tools
 from .tools import google as google_tools
 
@@ -141,6 +142,9 @@ class Agent:
             else "Gmail et Google Agenda ne sont pas connectés : si on te le demande, explique qu'il "
                  "faut lancer « python -m jarvis --connecter-google »."
         )
+        if spotify_tools.is_connected():
+            tools_note += (" Spotify est connecté : pour la musique, utilise spotify_jouer et spotify_controle "
+                           "plutôt que jouer_musique (sauf si l'utilisateur demande YouTube ou ses fichiers).")
         messages_note = (
             "Tu peux envoyer des SMS depuis le téléphone de l'utilisateur (envoyer_sms), toujours après son accord."
             if sms_tools.is_configured()
