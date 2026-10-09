@@ -51,6 +51,17 @@ async def start():
             await response.write_eof()
             return response
 
+        from . import charm
+
+        target = charm.wants_charm(charm._plain(text))
+        if target is not None:  # mode drague, aussi depuis le téléphone : réponse instantanée
+            state.flash((255, 120, 190), 6)
+            line = charm.line(themes.current(), themes.title(), target)
+            for event in ({"type": "sentence", "text": line}, {"type": "done"}):
+                await response.write((json.dumps(event, ensure_ascii=False) + "\n").encode())
+            await response.write_eof()
+            return response
+
         loop = asyncio.get_running_loop()
         events: asyncio.Queue = asyncio.Queue()
 
