@@ -284,10 +284,9 @@ class Jarvis:
             return True
         from . import charm
 
-        added = charm.ADD_RE.search(request)  # texte d'origine : le prénom garde ses accents
-        if added:
-            charm.add(added.group(1))
-            self.voice.say(f"C'est noté. {added.group(1).capitalize()} a droit à mon meilleur charme.")
+        reply = charm.command(request)
+        if reply:
+            self.voice.say(reply)
             return True
         target = charm.wants_charm(plain)
         if target is not None:  # « que penses-tu de cette personne ? » : compliment mignon, instantané

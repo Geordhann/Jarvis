@@ -312,7 +312,12 @@ Trois personnages, chacun avec sa voix, son caractère, sa couleur, ses bruitage
 « Jarvis, **que penses-tu de cette personne ?** » (ou « tu la trouves comment ? », « que penses-tu de
 ma copine ? ») : compliment mignon et drôle, instantané, différent à chaque fois, adressé directement
 à la personne. La boule passe au rose. Chaque personnage a son style (Ultron et Big Boss aussi).
-Avec un prénom : « Jarvis, **ajoute Léa à ta liste de charme** », puis « que penses-tu de Léa ? ».
+**Liste de charme** (avec ce qui décrit chaque personne) :
+- « Jarvis, **ajoute Léa à ta liste de charme, elle est drôle, cool et fan de mangas** »
+- « Jarvis, **Léa est aussi sportive** » (complète), « **qui est dans ta liste de charme ?** »,
+  « **retire Léa de ta liste de charme** »
+- « Jarvis, **que penses-tu de Léa ?** » → une phrase **sur mesure** qui rebondit sur ses mots
+  (écrite à la volée, ~1 seconde ; phrase prête si pas d'Internet). Liste dans `~/.jarvis/charme.json`.
 
 ### Jeux
 - **« Jarvis, lance Rocket League »** : lance directement un jeu Steam installé, même avec un nom
