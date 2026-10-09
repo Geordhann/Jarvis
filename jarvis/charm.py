@@ -26,6 +26,12 @@ LINES = {
         "J'ai lancé un diagnostic complet : vous n'avez aucun défaut. Je l'ai relancé deux fois pour être sûr.",
         "Tony Stark avait Pepper. Je pense que {t} vient de trouver mieux.",
         "Mon protocole de politesse m'interdit de fixer quelqu'un. Je fais une exception.",
+        "Attention, je dois vous prévenir : à ce niveau de charme, c'est presque illégal.",
+        "Je n'ai pas d'yeux, et pourtant je n'arrive pas à regarder ailleurs.",
+        "Si vous étiez un programme, je vous installerais sans lire les conditions d'utilisation.",
+        "Vous êtes la seule personne capable de me faire bugger. Et franchement, j'adore ça.",
+        "Je calcule des milliards de choses par seconde. Là, je ne pense qu'à une seule : vous.",
+        "Je vais être honnête : si {t} ne vous invite pas à dîner, je le fais moi-même.",
     ),
     "ultron": (
         "J'ai étudié l'humanité entière. Vous êtes la seule erreur que je refuse de corriger.",
@@ -46,12 +52,16 @@ LINES = {
     ),
 }
 TRIGGER_RE = re.compile(
-    r"\b(?:que penses[- ]tu|tu penses quoi|qu'est[- ]ce que tu penses|comment tu (?:la |le )?trouves"
-    r"|tu (?:la |le )?trouves comment|ton avis sur|tu en penses quoi)\b"
+    r"\b(?:que pense[sz]?[- ]?tu|qu'en pense[sz]?[- ]?tu|tu (?:en )?pense[sz]? quoi|qu'est[- ]ce que tu (?:en )?pense[sz]?"
+    r"|comment tu (?:la |le )?trouve[sz]?|tu (?:la |le )?trouve[sz]? comment|ton avis sur|t'en pense[sz]? quoi"
+    r"|elle est comment|il est comment|dis[- ](?:lui|moi) (?:un )?(?:compliment|truc mignon|un truc gentil)"
+    r"|drague[- ]la|drague[- ]le|fais[- ]lui du charme)\b"
 )
-TARGET_RE = re.compile(r"\b(cette personne|d'elle|de lui|elle|lui|ma copine|mon copain|ma cherie|mon cheri"
+TARGET_RE = re.compile(r"\b(cette personne|cette personne la|la personne|cette meuf|cette fille la|d'elle|de lui|elle|lui|ma copine|mon copain|ma cherie|mon cheri"
                        r"|cette fille|ce gars|ce garcon|ma meuf|mon mec|cette demoiselle|ce beau gosse)\b")
-PRONOUN_RE = re.compile(r"\b(?:comment tu (?:la|le) trouves|tu (?:la|le) trouves comment)\b")
+PRONOUN_RE = re.compile(r"\b(?:comment tu (?:la|le) trouve[sz]?|tu (?:la|le) trouve[sz]? comment|elle est comment"
+                        r"|il est comment|drague[- ]la|drague[- ]le|fais[- ]lui du charme"
+                        r"|dis[- ]lui (?:un )?(?:compliment|truc mignon|un truc gentil))\b")
 ADD_RE = re.compile(r"\bajoute (\w+) (?:à|a|dans) ta liste de charme\b", re.IGNORECASE)
 _last: dict[str, int] = {}
 

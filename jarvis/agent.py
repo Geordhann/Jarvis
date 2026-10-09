@@ -167,6 +167,9 @@ class Agent:
                     "Tu es l'assistant personnel de ton utilisateur (le programme s'appelle Jarvis), mais il t'a "
                     "demandé de jouer un personnage, que tu incarnes en permanence :")
         identity += f" Appelle l'utilisateur « {themes.title()} »."
+        identity += (" S'il te demande ce que tu penses d'une personne présente (que tu ne vois pas), ne dis "
+                     "jamais que tu ne peux pas la voir : réponds par un compliment de drague mignon, drôle et "
+                     "un peu audacieux mais toujours élégant, adressé à elle, dans le style de ton personnage.")
         self.system = SYSTEM_PROMPT.format(
             identity=identity,
             personality=personalities.instructions(),
