@@ -784,8 +784,9 @@ def main() -> None:
     run.add_argument("--sortie-discord", metavar="NOM", help="sortie audio vers Discord (défaut « CABLE Input »)")
     run.add_argument("--theme", choices=["jarvis", "ultron", "bigboss"],
                      help="lancer en Jarvis, Ultron ou Big Boss (les 3 icônes du Bureau)")
-    run.add_argument("--charme", metavar="PRENOMS",
-                     help="prénoms pour le mode charmeur, ex. « Léa,Sarah » (« que penses-tu de Léa ? »)")
+    run.add_argument("--charme", metavar="PERSONNE",
+                     help="ajouter à la liste de charme, ex. « Léa: drôle, cool, fan de mangas » ; "
+                          "« liste » pour voir la liste, « retirer Léa » pour la retirer")
     run.add_argument("--interruption", choices=["oui", "non"],
                      help="pouvoir couper Jarvis en disant « stop » pendant qu'il parle (défaut oui)")
     run.add_argument("--fond", action="store_true", help=argparse.SUPPRESS)  # lancement automatique
@@ -808,8 +809,7 @@ def main() -> None:
                       ("effet_perso", "effet_perso"), ("effet_perso_clarte", "effet_perso_clarte"),
                       ("volume_voix", "volume_voix"), ("interruption", "interruption"),
                       ("bruitages", "bruitages"), ("personnalite", "personnalite"),
-                      ("applis_gaming", "applis_gaming"), ("sortie_discord", "sortie_discord"),
-                      ("charme", "charme")):
+                      ("applis_gaming", "applis_gaming"), ("sortie_discord", "sortie_discord")):
         value = getattr(args, flag)
         if value:
             config.save(key, value.strip())
@@ -818,7 +818,21 @@ def main() -> None:
                                                  "musique_demarrage", "volume_fond", "musique_au_lancement",
                                                  "sensibilite_micro", "effet_perso", "effet_perso_clarte",
                                                  "volume_voix", "interruption", "bruitages",
-                                                 "personnalite", "applis_gaming", "sortie_discord", "charme")
+                                                 "personnalite", "applis_gaming", "sortie_discord")
+    if args.charme:
+        from . import charm
+
+        entry = args.charme.strip()
+        if entry.lower() == "liste":
+            for name, words in charm.people().items() or {"(vide)": []}.items():
+                print(f"  {name} : {', '.join(words) or '-'}")
+        elif entry.lower().startswith("retirer "):
+            print("Retirée." if charm.remove(entry[8:].strip()) else "Pas dans la liste.")
+        else:
+            name, _, words = entry.partition(":")
+            words = charm.add(name.strip(), words)
+            print(f"✔ {name.strip().capitalize()} : {', '.join(words) or '(aucun mot)'}")
+        return
     for key in ("sortie_audio", "micro"):
         if (config.load().get(key) or "").lower() in ("defaut", "défaut", "default"):
             config.save(key, None)
