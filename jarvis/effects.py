@@ -15,8 +15,6 @@ PRESETS = {
     "droide": "droïde : métallique et un peu nasillard",
     "tactique": "droïde tactique : plus grave, froid et métallique",
     "robot": "robot : très métallique, façon vieux synthétiseur",
-    "ultron": "Ultron : grave, métallique et réverbéré, façon IA menaçante",
-    "codec": "codec de Metal Gear : voix grave et rugueuse passée par une radio",
     "perso": "ta chaîne Voicemod : PowerPitch → Robotifier → Hauteur (réglable avec --effet-perso)",
 }
 
@@ -150,20 +148,6 @@ def _board(name: str):
                                       Bitcrush(bit_depth=11), LowpassFilter(6000),
                                       Reverb(room_size=0.1, wet_level=0.1, dry_level=0.95),
                                       Compressor(threshold_db=-18, ratio=3), Gain(3)])
-    if name == "ultron":
-        from pedalboard import Distortion, PeakFilter
-
-        return (45, 0.18), Pedalboard([PitchShift(semitones=-4), HighpassFilter(60),
-                                       Chorus(rate_hz=0.4, depth=0.2, centre_delay_ms=9, mix=0.3),
-                                       Distortion(drive_db=4), PeakFilter(cutoff_frequency_hz=180, gain_db=4),
-                                       Reverb(room_size=0.45, damping=0.6, wet_level=0.18, dry_level=0.9),
-                                       Compressor(threshold_db=-20, ratio=3), Gain(3)])
-    if name == "codec":
-        from pedalboard import Distortion
-
-        return None, Pedalboard([PitchShift(semitones=-2), HighpassFilter(320), LowpassFilter(3400),
-                                 Distortion(drive_db=10), Bitcrush(bit_depth=12),
-                                 Compressor(threshold_db=-22, ratio=4), Gain(4)])
     if name == "robot":
         return (30, 0.85), Pedalboard([HighpassFilter(200), Bitcrush(bit_depth=8), LowpassFilter(4500),
                                        Compressor(threshold_db=-16, ratio=4), Gain(4)])
@@ -176,7 +160,6 @@ def apply(mp3: bytes, name: str | None = None) -> tuple[bytes, str]:
     if name == "aucun":
         return mp3, "mp3"
     try:
-        import numpy as np
         from pedalboard.io import AudioFile
 
         with AudioFile(io.BytesIO(mp3)) as f:
@@ -189,10 +172,6 @@ def apply(mp3: bytes, name: str | None = None) -> tuple[bytes, str]:
                 audio = _ring_mod(audio, sample_rate, *ring)
             if board is not None:
                 audio = board(audio, sample_rate)
-            if name == "codec":  # léger souffle de radio
-                import numpy as np
-
-                audio = audio + np.random.default_rng(1).normal(0, 0.004, audio.shape).astype(np.float32)
         audio = _loud(audio, sample_rate)
         out = io.BytesIO()
         with AudioFile(out, "w", sample_rate, audio.shape[0], format="wav") as f:

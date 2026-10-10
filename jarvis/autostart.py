@@ -81,6 +81,7 @@ $shell = New-Object -ComObject WScript.Shell
 $places = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs'))
 $links = $env:JARVIS_LINKS | ConvertFrom-Json
 foreach ($dir in $places) {
+    Remove-Item (Join-Path $dir 'Ultron.lnk'), (Join-Path $dir 'Big Boss.lnk') -ErrorAction SilentlyContinue
     foreach ($item in $links) {
         $path = Join-Path $dir ($item.name + '.lnk')
         $link = $shell.CreateShortcut($path)
@@ -113,20 +114,30 @@ def _icon_path(theme: str = "jarvis") -> str | None:
         return None
 
 
+def _remove_old_shortcuts() -> None:
+    """Supprime les icônes Ultron et Big Boss des anciennes versions."""
+    for folder in (Path(os.environ.get("USERPROFILE", Path.home())) / "Desktop",
+                   Path(os.environ.get("USERPROFILE", Path.home())) / "OneDrive" / "Desktop",
+                   Path(os.environ.get("USERPROFILE", Path.home())) / "OneDrive" / "Bureau",
+                   Path(os.environ.get("APPDATA", "")) / "Microsoft/Windows/Start Menu/Programs"):
+        for name in ("Ultron.lnk", "Big Boss.lnk"):
+            try:
+                (folder / name).unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
 def create_shortcuts() -> list[str]:
     """Icône « Jarvis » à double-cliquer : Bureau + menu Démarrer (ou équivalents)."""
     import subprocess
 
     import json
 
-    from .themes import THEMES
-
     python = _python()
     icon = _icon_path()
     if sys.platform == "win32":
-        # Trois icônes : Jarvis, Ultron et Big Boss, chacune lance (ou transforme) Jarvis dans son thème.
-        links = [{"name": t["shortcut"], "args": " ".join([*ARGS, "--theme", key]), "icon": _icon_path(key) or ""}
-                 for key, t in THEMES.items()]
+        links = [{"name": "Jarvis", "args": " ".join(ARGS), "icon": icon or ""}]
+        _remove_old_shortcuts()
         env = {**os.environ, "JARVIS_EXE": python, "JARVIS_LINKS": json.dumps(links),
                "JARVIS_DIR": str(PROJECT_DIR)}
         out = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", _PS_SHORTCUT],

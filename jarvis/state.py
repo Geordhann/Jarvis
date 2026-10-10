@@ -90,18 +90,3 @@ def flash_color() -> tuple[int, int, int] | None:
         if _flash and time.monotonic() < _flash[1]:
             return _flash[0]
         return None
-
-
-_theme_listeners: list = []
-
-
-def on_theme(callback) -> None:
-    _theme_listeners.append(callback)
-
-
-def request_theme(name: str) -> None:
-    """Icône Ultron / Big Boss / Jarvis cliquée alors que Jarvis tourne déjà : il change de thème."""
-    import threading as _threading
-
-    for callback in list(_theme_listeners):
-        _threading.Thread(target=callback, args=(name,), daemon=True).start()

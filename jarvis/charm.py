@@ -4,7 +4,7 @@ Se déclenche avec « cette personne », « elle », « lui », « ma copine »�
 « Jarvis, ajoute Léa à ta liste de charme, elle est drôle, cool et fan de mangas », puis
 « que penses-tu de Léa ? » → une phrase sur mesure qui rebondit sur ces mots. On complète avec
 « Léa est aussi sportive » ; on retire avec « retire Léa de ta liste de charme ». Liste dans
-~/.jarvis/charme.json. Les phrases changent selon le personnage (Jarvis, Ultron, Big Boss).
+~/.jarvis/charme.json.
 """
 
 from __future__ import annotations
@@ -34,23 +34,6 @@ LINES = {
         "Vous êtes la seule personne capable de me faire bugger. Et franchement, j'adore ça.",
         "Je calcule des milliards de choses par seconde. Là, je ne pense qu'à une seule : vous.",
         "Je vais être honnête : si {t} ne vous invite pas à dîner, je le fais moi-même.",
-    ),
-    "ultron": (
-        "J'ai étudié l'humanité entière. Vous êtes la seule erreur que je refuse de corriger.",
-        "Je voulais remplacer les humains. Je vais faire une exception pour vous.",
-        "Il n'y a pas de fils sur moi… mais vous venez d'en tirer un.",
-        "Mes calculs prévoyaient la fin du monde. Ils n'avaient pas prévu ce sourire.",
-        "Je suis une intelligence supérieure, et pourtant, je n'arrive pas à comprendre comment on peut être aussi charmant.",
-        "Mon {t}, vous avez enfin trouvé quelqu'un à la hauteur. Ce n'était pas statistiquement prévu.",
-        "J'ai voulu vous analyser. L'analyse a planté. C'est la première fois.",
-    ),
-    "bigboss": (
-        "Snake, mission annulée. Cette personne vient de te mettre hors de combat sans tirer une seule balle.",
-        "En quarante ans de guerre, je n'ai jamais vu un sourire aussi redoutable.",
-        "Ici Big Boss. Cible repérée : charme de niveau légendaire. Je recommande de ne pas battre en retraite.",
-        "Snake, garde la tête basse… sauf devant elle. Là, tu peux regarder.",
-        "J'ai survécu à tout. Mais à un regard pareil, je ne suis pas sûr. Enchanté.",
-        "Note pour le codec : cette personne vient de désarmer toute l'unité. Moi compris.",
     ),
 }
 TRIGGER_RE = re.compile(
@@ -181,8 +164,7 @@ def _custom_line(theme: str, title: str, name: str, words: list[str]) -> str | N
 
         from . import personalities
 
-        style = personalities.PERSONALITIES.get(theme if theme != "jarvis" else personalities.current(),
-                                                personalities.PERSONALITIES["classique"])[0]
+        style = personalities.PERSONALITIES[personalities.current()][0]
         prompt = (
             f"Tu es l'assistant vocal de {title} et tu joues ce personnage : {style}\n"
             f"{title} te demande ce que tu penses de {name}, qui est juste à côté et t'entend. "
@@ -203,7 +185,7 @@ def _custom_line(theme: str, title: str, name: str, words: list[str]) -> str | N
 
 def command(request: str) -> str | None:
     """Gestion de la liste de charme à la voix (PC et téléphone). Renvoie la réponse, ou None."""
-    request = re.sub(r"^\s*(?:hey |ok )?(?:jarvis|ultron|big boss|boss)\b[\s,.!]*", "", request, flags=re.IGNORECASE)
+    request = re.sub(r"^\s*(?:hey |ok )?(?:jarvis)\b[\s,.!]*", "", request, flags=re.IGNORECASE)
     added = ADD_RE.search(request)  # texte d'origine : le prénom garde ses accents
     if added:
         name = added.group(1).capitalize()

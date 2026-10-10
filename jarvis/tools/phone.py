@@ -13,7 +13,6 @@ import re
 import shutil
 import subprocess
 import sys
-import time
 import unicodedata
 import zipfile
 from pathlib import Path

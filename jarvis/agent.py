@@ -162,10 +162,7 @@ class Agent:
 
         from . import themes
 
-        identity = ("Tu es JARVIS, l'assistant personnel de ton utilisateur, inspiré du majordome IA d'Iron Man."
-                    if themes.current() == "jarvis" else
-                    "Tu es l'assistant personnel de ton utilisateur (le programme s'appelle Jarvis), mais il t'a "
-                    "demandé de jouer un personnage, que tu incarnes en permanence :")
+        identity = "Tu es JARVIS, l'assistant personnel de ton utilisateur, inspiré du majordome IA d'Iron Man."
         identity += f" Appelle l'utilisateur « {themes.title()} »."
         identity += (" S'il te demande ce que tu penses d'une personne présente (que tu ne vois pas), ne dis "
                      "jamais que tu ne peux pas la voir : réponds par un compliment de drague mignon, drôle et "
