@@ -333,8 +333,7 @@ Le PC fait le travail ; le téléphone sert de micro, d'écran et de haut-parleu
 2. Sur le PC : `python -m jarvis --configurer-mobile` → il affiche l'adresse (`https://ton-pc….ts.net`)
    et un **code d'accès**. (Si Tailscale affiche un lien pour activer HTTPS/Serve, ouvre-le puis relance.)
 3. Sur le téléphone, ouvre l'adresse dans **Chrome**, tape le code, puis menu ⋮ → **Ajouter à l'écran
-   d'accueil**. Autorise le micro, coche **Mains libres** et parle : « Jarvis… », « Ultron… » ou « Boss… »
-   selon le personnage choisi (boutons **Personnage** de la page).
+   d'accueil**. Autorise le micro, coche **Mains libres** et parle : « Jarvis… ».
 
 L'interface n'est visible que par tes appareils Tailscale (jamais sur Internet), en HTTPS, avec code
 d'accès (5 erreurs = blocage 10 minutes). Le PC doit être allumé avec Jarvis lancé.
