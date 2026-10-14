@@ -28,7 +28,7 @@ API = "https://api.spotify.com/v1"
 ACCOUNTS = "https://accounts.spotify.com"
 PORT = 8766
 REDIRECT = f"http://127.0.0.1:{PORT}/callback"
-SCOPES = ("user-read-playback-state user-modify-playback-state user-read-currently-playing "
+SCOPES = ("user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing "
           "playlist-read-private playlist-read-collaborative user-library-read user-library-modify")
 
 
@@ -217,7 +217,8 @@ def _search(recherche: str, kind: str) -> dict | None:
             return found
     if kind == "titres_likes":
         return {"uri": "spotify:collection:tracks", "name": "tes titres likés"}
-    results = _api("GET", "/search", params={"q": recherche, "type": kind, "limit": 1, "market": "from_token"})
+    # Pas de « market=from_token » : il exige l'autorisation user-read-private (erreur « Insufficient client scope »).
+    results = _api("GET", "/search", params={"q": recherche, "type": kind, "limit": 1})
     items = (results.get(f"{kind}s") or {}).get("items") or []
     return next((i for i in items if i), None)
 
