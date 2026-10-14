@@ -85,6 +85,17 @@ PRESENTATIONS = {
 }
 
 
+def _voice_check() -> str:
+    """Pour le diagnostic : la voix en ligne répond-elle ? (sinon Jarvis prend la voix de secours de Windows)"""
+    from . import tts
+
+    try:
+        tts.synthesize("Test.")
+        return "OK"
+    except Exception as exc:
+        return f"en panne, voix de secours utilisée ({exc})"
+
+
 def _plain(text: str) -> str:
     text = unicodedata.normalize("NFD", text.lower())
     return "".join(c for c in text if unicodedata.category(c) != "Mn")
@@ -515,6 +526,7 @@ class Jarvis:
         checks = [
             ("Dossier", str(folder)),
             ("Version", datetime.datetime.fromtimestamp(newest).strftime("%d/%m %H:%M")),
+            ("Voix", _voice_check()),
             ("Bruitages", "désactivés" if not sounds.enabled() else
              ("OK" if sounds.play("ecoute") else f"en panne ({sounds.last_error})")),
             ("Pulsation de la boule", state.meter_status),

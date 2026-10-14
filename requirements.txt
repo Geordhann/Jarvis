@@ -1,7 +1,7 @@
 # Cerveau
 anthropic>=1.11
 # Voix et écoute sur l'ordinateur
-edge-tts
+edge-tts>=7.3.1
 pygame
 SpeechRecognition
 PyAudio

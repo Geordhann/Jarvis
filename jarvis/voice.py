@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import os
 import queue
+import subprocess
+import sys
 import tempfile
 import threading
+import time
 
 from . import effects, state, tts
 
@@ -128,6 +131,10 @@ class Voice:
             os.remove(path)
 
     def _speak_offline(self, text: str) -> None:
+        """Secours sans Internet : voix d'homme française de Windows, qu'on peut couper avec « stop »."""
+        if sys.platform == "win32":
+            self._speak_windows(text)
+            return
         import pyttsx3
 
         if self._engine is None:
@@ -138,3 +145,24 @@ class Voice:
                     break
         self._engine.say(text)
         self._engine.runAndWait()
+
+    def _speak_windows(self, text: str) -> None:
+        # Dans un processus à part : pyttsx3 se bloque parfois sous Windows, ce qui figeait Jarvis.
+        script = (
+            "Add-Type -AssemblyName System.Speech;"
+            "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer;"
+            "$v = $s.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo } | "
+            "Where-Object { $_.Culture.Name -like 'fr*' } | Sort-Object { $_.Gender -ne 'Male' } | Select-Object -First 1;"
+            "if ($v) { $s.SelectVoice($v.Name) };"
+            "$s.Speak($env:JARVIS_TEXTE)"
+        )
+        process = subprocess.Popen(["powershell", "-NoProfile", "-Command", script],
+                                   env={**os.environ, "JARVIS_TEXTE": text},
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        deadline = time.monotonic() + 60
+        while process.poll() is None:
+            if self.stopped or time.monotonic() > deadline:
+                process.kill()
+                break
+            time.sleep(0.05)

@@ -68,6 +68,18 @@ def _eleven_tts(text: str, voice_id: str, lang: str = "fr") -> bytes:
 
 
 def _edge_tts(text: str, voice_id: str) -> bytes:
+    """Voix gratuite de Microsoft Edge. Un second essai rattrape les coupures réseau passagères."""
+    try:
+        return _edge_tts_once(text, voice_id)
+    except Exception as first:
+        print(f"[voix] voix gratuite indisponible ({first}), nouvel essai…")
+        try:
+            return _edge_tts_once(text, voice_id)
+        except Exception as exc:
+            raise RuntimeError(f"{exc} — vérifie Internet, puis mets à jour : pip install -U edge-tts") from exc
+
+
+def _edge_tts_once(text: str, voice_id: str) -> bytes:
     import edge_tts
 
     async def run() -> bytes:
@@ -76,6 +88,8 @@ def _edge_tts(text: str, voice_id: str) -> bytes:
         async for chunk in speech.stream():
             if chunk["type"] == "audio":
                 audio.extend(chunk["data"])
+        if not audio:
+            raise RuntimeError("aucun son reçu")
         return bytes(audio)
 
     try:
