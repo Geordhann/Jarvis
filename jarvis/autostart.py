@@ -85,11 +85,11 @@ foreach ($dir in $places) {
     foreach ($item in $links) {
         $path = Join-Path $dir ($item.name + '.lnk')
         $link = $shell.CreateShortcut($path)
-        $link.TargetPath = $env:JARVIS_EXE
+        $link.TargetPath = $(if ($item.target) { $item.target } else { $env:JARVIS_EXE })
         $link.Arguments = $item.args
         $link.WorkingDirectory = $env:JARVIS_DIR
         if ($item.icon) { $link.IconLocation = $item.icon }
-        $link.Description = $item.name + ', assistant personnel'
+        $link.Description = $item.name
         $link.Save()
         Write-Output $path
     }
@@ -136,7 +136,11 @@ def create_shortcuts() -> list[str]:
     python = _python()
     icon = _icon_path()
     if sys.platform == "win32":
-        links = [{"name": "Jarvis", "args": " ".join(ARGS), "icon": icon or ""}]
+        updater = PROJECT_DIR / "jarvis" / "mise_a_jour.ps1"
+        links = [{"name": "Jarvis", "args": " ".join(ARGS), "icon": icon or ""},
+                 # Icône « Mettre à jour Jarvis » : télécharge la dernière version depuis GitHub.
+                 {"name": "Mettre a jour Jarvis", "target": "powershell.exe",
+                  "args": f'-NoProfile -ExecutionPolicy Bypass -File "{updater}"', "icon": icon or ""}]
         _remove_old_shortcuts()
         env = {**os.environ, "JARVIS_EXE": python, "JARVIS_LINKS": json.dumps(links),
                "JARVIS_DIR": str(PROJECT_DIR)}

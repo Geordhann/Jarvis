@@ -276,9 +276,13 @@ faire bannir ton compte). Jarvis passe donc par ton écran : « ouvre mes messag
 c'est toi qui l'envoies).
 
 ### Mettre à jour
-Télécharge le nouveau `jarvis.zip` (il arrive dans **Téléchargements**), puis double-clique sur
-**`METTRE-A-JOUR-JARVIS.bat`** dans ton dossier Jarvis : il arrête Jarvis, copie la nouvelle version,
-installe les composants et le relance. Tes réglages ne bougent pas.
+Double-clique sur l'icône **Mettre a jour Jarvis** du Bureau (ou colle cette ligne dans PowerShell) :
+```
+irm https://raw.githubusercontent.com/Geordhann/Jarvis/ccr-3c3d8b8c-punmtx/jarvis/mise_a_jour.ps1 | iex
+```
+Elle arrête Jarvis, télécharge la dernière version depuis GitHub, installe les composants et refait
+les icônes. Il ne reste qu'à relancer Jarvis. Tes réglages ne bougent pas. (La même ligne installe
+Jarvis sur un nouveau PC.)
 
 ## 3. Utilisation
 
