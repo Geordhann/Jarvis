@@ -275,6 +275,11 @@ faire bannir ton compte). Jarvis passe donc par ton écran : « ouvre mes messag
 « regarde mon écran et résume mes messages », « réponds-lui que j'arrive » (il tape la réponse,
 c'est toi qui l'envoies).
 
+### Mettre à jour
+Télécharge le nouveau `jarvis.zip` (il arrive dans **Téléchargements**), puis double-clique sur
+**`METTRE-A-JOUR-JARVIS.bat`** dans ton dossier Jarvis : il arrête Jarvis, copie la nouvelle version,
+installe les composants et le relance. Tes réglages ne bougent pas.
+
 ## 3. Utilisation
 
 ### Couper Jarvis
