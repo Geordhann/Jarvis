@@ -89,10 +89,25 @@ def connect(client_id: str | None = None) -> None:
     }, timeout=20)
     response.raise_for_status()
     _save_token(response.json())
-    me = _api("GET", "/me")
-    premium = me.get("product") == "premium"
-    print(f"✔ Spotify connecté ({me.get('display_name') or me.get('id')}, "
-          f"{'Premium : contrôle complet' if premium else 'compte gratuit : Jarvis ouvrira les morceaux'}).")
+    test()
+
+
+def test() -> None:
+    """python -m jarvis --tester-spotify : vérifie le compte, la recherche et l'appli du PC."""
+    try:
+        me = _api("GET", "/me")
+        print(f"✔ Compte : {me.get('display_name') or me.get('id')}")
+        found = _search("Daft Punk", "artist")
+        print(f"✔ Recherche : {found.get('name') if found else 'aucun résultat'}")
+        devices = _api("GET", "/me/player/devices").get("devices", [])
+        print("✔ Appareils Spotify : " + (", ".join(d.get("name", "?") for d in devices) or
+                                          "aucun (ouvre l'appli Spotify sur le PC)"))
+        print("Spotify est prêt. Dis : « Jarvis, joue Daft Punk ».")
+    except SpotifyBlocked as exc:
+        print(f"✘ {exc}.")
+        print("  En attendant, Jarvis ouvrira la recherche dans l'appli Spotify (il restera à cliquer).")
+    except ToolFailure as exc:
+        print(f"✘ {exc}")
 
 
 def _save_token(data: dict) -> None:
@@ -124,19 +139,50 @@ def _access_token() -> str:
     return token["access_token"]
 
 
+class SpotifyBlocked(ToolFailure):
+    """Spotify refuse toute l'appli (règles de 2026) : on se rabat sur l'appli Spotify du PC."""
+
+
+class PremiumRequired(ToolFailure):
+    """Compte gratuit : Spotify interdit de lancer la lecture à distance."""
+
+
+OWNER_PREMIUM = ("Spotify refuse : depuis 2026, une appli perso comme Jarvis ne marche que si le compte qui l'a "
+                 "créée a Spotify Premium")
+NOT_REGISTERED = ("Spotify refuse : ajoute ton adresse mail Spotify dans « User Management » de ton appli, sur "
+                  "developer.spotify.com")
+
+
 def _api(method: str, path: str, **kwargs):
     response = requests.request(method, API + path, headers={"Authorization": f"Bearer {_access_token()}"},
                                 timeout=20, **kwargs)
+    if response.status_code < 400:
+        return response.json() if response.content else {}
+    try:
+        error = response.json().get("error", {})
+        message, reason = str(error.get("message", "")), str(error.get("reason", ""))
+    except ValueError:
+        message, reason = response.text[:200], ""
+    print(f"[spotify] {method} {path} → {response.status_code} {reason} {message}")
+    lowered = message.lower()
+    if response.status_code == 403 and "premium subscription required" in lowered:
+        raise SpotifyBlocked(OWNER_PREMIUM)
+    if response.status_code == 403 and ("not be registered" in lowered or "not registered" in lowered):
+        raise SpotifyBlocked(NOT_REGISTERED)
+    if response.status_code == 403 and (reason == "PREMIUM_REQUIRED" or path.startswith("/me/player")):
+        raise PremiumRequired("Spotify n'autorise le contrôle de la lecture qu'avec un compte Premium")
     if response.status_code == 404 and path.startswith("/me/player"):
         raise ToolFailure("aucun appareil Spotify actif : ouvre l'appli Spotify")
-    if response.status_code == 403 and path.startswith("/me/player"):
-        raise ToolFailure("Spotify n'autorise le contrôle qu'avec un compte Premium")
-    response.raise_for_status()
-    return response.json() if response.content else {}
+    if response.status_code == 401:
+        raise ToolFailure("connexion Spotify expirée : relance « python -m jarvis --connecter-spotify »")
+    raise ToolFailure(f"Spotify a répondu {response.status_code} : {message or reason or 'erreur inconnue'}")
 
 
-def _premium() -> bool:
-    return _api("GET", "/me").get("product") == "premium"
+def open_search(recherche: str) -> None:
+    """Sans accès à l'API : ouvre la recherche dans l'appli Spotify du PC (il reste à cliquer sur le titre)."""
+    from urllib.parse import quote
+
+    _open_app(f"spotify:search:{quote(recherche)}")
 
 
 # --- lecture -----------------------------------------------------------------
@@ -177,6 +223,14 @@ def _search(recherche: str, kind: str) -> dict | None:
 
 
 def spotify_jouer(recherche: str, type: str = "track", aleatoire: bool = False) -> str:
+    try:
+        return _spotify_jouer(recherche, type, aleatoire)
+    except SpotifyBlocked as exc:
+        open_search(recherche)
+        return f"{exc}. Recherche « {recherche} » ouverte dans l'appli Spotify : il faut cliquer sur le titre."
+
+
+def _spotify_jouer(recherche: str, type: str = "track", aleatoire: bool = False) -> str:
     kind = {"titre": "track", "artiste": "artist", "album": "album"}.get(type, type)
     if kind not in ("track", "artist", "album", "playlist", "titres_likes"):
         raise ToolFailure("type inconnu : track, artist, album, playlist ou titres_likes")
@@ -186,9 +240,14 @@ def spotify_jouer(recherche: str, type: str = "track", aleatoire: bool = False) 
     name = item.get("name", recherche)
     if kind == "track":
         name += " de " + ", ".join(a["name"] for a in item.get("artists", [])[:2])
-    if not _premium():
+    try:
+        return _play(item, kind, name, aleatoire)
+    except PremiumRequired:
         _open_app(item["uri"])
         return f"Compte gratuit : « {name} » est ouvert dans Spotify, il faut appuyer sur lecture."
+
+
+def _play(item: dict, kind: str, name: str, aleatoire: bool) -> str:
     device = _device_id()
     if not device:
         raise ToolFailure("l'appli Spotify ne répond pas : ouvre-la puis réessaie")
@@ -214,15 +273,15 @@ def play_best(recherche: str) -> str:
     query = re.sub(r"\s*(sur|avec|dans) spotify\s*$", "", recherche, flags=re.I).strip()
     words = plain(query)
     if re.match(r"(mes|mon) (titres|sons|musiques) (likes|aimes|preferes)|mes likes", words):
-        return spotify_jouer("", "titres_likes")
+        return _spotify_jouer("", "titres_likes")
     for prefix, kind in (("ma playlist ", "playlist"), ("la playlist ", "playlist"), ("playlist ", "playlist"),
                          ("l'album ", "album"), ("album ", "album")):
         if query.lower().startswith(prefix):
-            return spotify_jouer(query[len(prefix):], kind)
+            return _spotify_jouer(query[len(prefix):], kind)
     artist = _search(query, "artist")
     if artist and plain(artist.get("name", "")) == words:
-        return spotify_jouer(query, "artist", aleatoire=True)
-    return spotify_jouer(query, "track")
+        return _spotify_jouer(query, "artist", aleatoire=True)
+    return _spotify_jouer(query, "track")
 
 
 def spotify_controle(action: str, valeur: int = 50) -> str:
@@ -231,7 +290,7 @@ def spotify_controle(action: str, valeur: int = 50) -> str:
         track = (current or {}).get("item")
         if not track:
             raise ToolFailure("rien n'est en cours de lecture")
-        _api("PUT", "/me/tracks", params={"ids": track["id"]})
+        _api("PUT", "/me/library", params={"uris": track["uri"]})
         return f"« {track['name']} » ajouté à tes titres likés."
     calls = {
         "pause": ("PUT", "/me/player/pause", {}),
