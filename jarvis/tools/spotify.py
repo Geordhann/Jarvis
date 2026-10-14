@@ -157,7 +157,12 @@ def _api(method: str, path: str, **kwargs):
     response = requests.request(method, API + path, headers={"Authorization": f"Bearer {_access_token()}"},
                                 timeout=20, **kwargs)
     if response.status_code < 400:
-        return response.json() if response.content else {}
+        # Certaines commandes de lecture (aléatoire, lecture…) répondent par un texte vide ou qui n'est pas du
+        # JSON : ce n'est pas une erreur, la commande a marché.
+        try:
+            return response.json() if response.content.strip() else {}
+        except ValueError:
+            return {}
     try:
         error = response.json().get("error", {})
         message, reason = str(error.get("message", "")), str(error.get("reason", ""))
@@ -319,6 +324,36 @@ def spotify_en_cours() -> str:
     return f"« {track['name']} » de {artists}, album « {track.get('album', {}).get('name', '?')} »."
 
 
+def spotify_chercher(recherche: str, type: str = "track") -> str:
+    """Les 5 premiers résultats Spotify, pour choisir avant de lancer."""
+    kind = {"titre": "track", "artiste": "artist", "album": "album"}.get(type, type)
+    if kind not in ("track", "artist", "album", "playlist"):
+        raise ToolFailure("type inconnu : track, artist, album ou playlist")
+    results = _api("GET", "/search", params={"q": recherche, "type": kind, "limit": 5})
+    lines = []
+    for item in (results.get(f"{kind}s") or {}).get("items") or []:
+        if not item:
+            continue
+        artists = ", ".join(a["name"] for a in item.get("artists", [])[:2])
+        lines.append(f"- {item.get('name')}" + (f" ({artists})" if artists else ""))
+    return "\n".join(lines) or "Aucun résultat."
+
+
+def spotify_playlist_contenu(nom: str) -> str:
+    """Les titres d'une de ses playlists (seulement les siennes, règle Spotify 2026)."""
+    playlist = _search(nom, "playlist")
+    if not playlist or not playlist.get("id"):
+        raise ToolFailure(f"playlist « {nom} » introuvable dans tes playlists")
+    data = _api("GET", f"/playlists/{playlist['id']}/items", params={"limit": 50})
+    lines = []
+    for entry in data.get("items") or []:
+        track = (entry or {}).get("item") or (entry or {}).get("track") or {}
+        if track.get("name"):
+            artists = ", ".join(a["name"] for a in track.get("artists", [])[:2])
+            lines.append(f"- {track['name']} ({artists})")
+    return f"Playlist « {playlist.get('name')} » :\n" + ("\n".join(lines) or "vide")
+
+
 def spotify_playlists() -> str:
     items = _api("GET", "/me/playlists", params={"limit": 50}).get("items", [])
     return "\n".join(p["name"] for p in items if p) or "Aucune playlist."
@@ -344,4 +379,11 @@ def tools() -> list[Tool]:
              spotify_controle, ["action"]),
         Tool("spotify_en_cours", "Dit quel titre passe sur Spotify.", {}, spotify_en_cours),
         Tool("spotify_playlists", "Liste les playlists Spotify de l'utilisateur.", {}, spotify_playlists),
+        Tool("spotify_chercher", "Cherche sur Spotify et donne les 5 premiers résultats (pour choisir ou "
+             "proposer avant de lancer avec spotify_jouer).",
+             {"recherche": string("ce qu'il faut chercher"),
+              "type": {"type": "string", "enum": ["track", "artist", "album", "playlist"]}},
+             spotify_chercher, ["recherche"]),
+        Tool("spotify_playlist_contenu", "Liste les titres d'une playlist de l'utilisateur.",
+             {"nom": string("nom (ou partie du nom) de la playlist")}, spotify_playlist_contenu, ["nom"]),
     ]
